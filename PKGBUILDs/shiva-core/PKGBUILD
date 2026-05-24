@@ -46,8 +46,6 @@ backend=auto
 groq_model=llama-3.3-70b-versatile
 ollama_model=phi3:mini
 EOF
-    install -Dm644 "${pkgdir}/etc/shiva-ai.conf" "${pkgdir}/etc/shiva-ai.conf"
-
     # ── KWallet désactivé ─────────────────────────────────────────
     install -dm755 "${pkgdir}/etc/xdg"
     cat > "${pkgdir}/etc/xdg/kwalletrc" << 'EOF'

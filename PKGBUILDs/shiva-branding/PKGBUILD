@@ -83,7 +83,7 @@ EOF
     install -m644 "$srcdir/shivaos-void-3440x1440.png"       "$pkgdir/usr/share/wallpapers/ShivaOS-void/contents/images/"
 
     # ── 1c. Wallpapers manga ─────────────────────────────────────
-    for i in $(seq -w 1 13); do
+    for i in $(seq 1 13); do
         N=$(printf "%02d" $i)
         install -dm755 "$pkgdir/usr/share/wallpapers/ShivaOS-manga-${N}/contents/images"
         printf '{"KPlugin":{"Authors":[{"Name":"ShivaOS Team","Email":"contact@shivaos.com"}],"Id":"ShivaOS-manga-%s","License":"CC-BY-SA","Name":"ShivaOS Manga %s","Version":"1.0"}}\n' \
