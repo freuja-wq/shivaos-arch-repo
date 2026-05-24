@@ -81,7 +81,7 @@ package_linux-shivaos() {
     echo "${pkgbase}" | install -Dm644 /dev/stdin "${modulesdir}/pkgbase"
 
     make INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 modules_install
-    rm "${modulesdir}/source" "${modulesdir}/build"
+    rm -f "${modulesdir}/source" "${modulesdir}/build"
 
     # mkinitcpio preset
     install -Dm644 /dev/stdin "${pkgdir}/etc/mkinitcpio.d/${pkgbase}.preset" << EOF
