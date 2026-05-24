@@ -1,20 +1,21 @@
 # Maintainer: ShivaOS Team <contact@shivaos.com>
+# Source: https://github.com/Korthos-Software/low_latency_layer
 # Couche Vulkan implicite — Reflex + Anti-Lag sur tous les GPU
 # Usage Steam : PROTON_FORCE_NVAPI=1 LOW_LATENCY_LAYER_REFLEX=1 LOW_LATENCY_LAYER_SPOOF_NVIDIA=1 %command%
 pkgname=low-latency-layer
-pkgver=2.0.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Vulkan implicit layer — Reflex + Anti-Lag pour tous les GPU"
 arch=('x86_64')
-url="https://shivaos.com"
+url="https://github.com/Korthos-Software/low_latency_layer"
 license=('MIT')
 depends=('vulkan-icd-loader')
 makedepends=('cmake' 'vulkan-headers' 'ninja')
-source=("low-latency-layer-${pkgver}.tar.gz::https://github.com/freuja-wq/low-latency-layer/archive/refs/tags/v${pkgver}.tar.gz")
+source=("low-latency-layer-${pkgver}.tar.gz::https://github.com/Korthos-Software/low_latency_layer/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-    cd "low-latency-layer-${pkgver}"
+    cd "low_latency_layer-${pkgver}"
     cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
@@ -23,6 +24,6 @@ build() {
 }
 
 package() {
-    cd "low-latency-layer-${pkgver}"
+    cd "low_latency_layer-${pkgver}"
     DESTDIR="$pkgdir" cmake --install build
 }
