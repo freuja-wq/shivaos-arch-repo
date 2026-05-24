@@ -10,12 +10,18 @@ arch=('x86_64')
 url="https://github.com/Korthos-Software/low_latency_layer"
 license=('MIT')
 depends=('vulkan-icd-loader')
-makedepends=('cmake' 'vulkan-headers' 'ninja')
-source=("low-latency-layer-${pkgver}.tar.gz::https://github.com/Korthos-Software/low_latency_layer/archive/refs/tags/v${pkgver}.tar.gz")
+makedepends=('cmake' 'vulkan-headers' 'ninja' 'git')
+source=("low_latency_layer::git+https://github.com/Korthos-Software/low_latency_layer.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
+pkgver() {
+    cd "low_latency_layer"
+    # Retourne la dernière version depuis les tags git (ex: v0.2.0 → 0.2.0)
+    git describe --tags --abbrev=0 | sed 's/^v//'
+}
+
 build() {
-    cd "low_latency_layer-${pkgver}"
+    cd "low_latency_layer"
     cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
@@ -24,6 +30,6 @@ build() {
 }
 
 package() {
-    cd "low_latency_layer-${pkgver}"
+    cd "low_latency_layer"
     DESTDIR="$pkgdir" cmake --install build
 }

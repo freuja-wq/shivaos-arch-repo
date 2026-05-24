@@ -1,0 +1,103 @@
+name: Auto-update low-latency-layer
+
+on:
+  schedule:
+    # Vérifie chaque nuit à 3h UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Récupérer la dernière version upstream
+        id: upstream
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/Korthos-Software/low_latency_layer/releases/latest \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
+          echo "Dernière version upstream : $LATEST"
+
+      - name: Lire la version actuelle dans PKGBUILD
+        id: current
+        run: |
+          CURRENT=$(grep '^pkgver=' PKGBUILDs/low-latency-layer/PKGBUILD | cut -d= -f2)
+          echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Version actuelle PKGBUILD : $CURRENT"
+
+      - name: Comparer les versions
+        id: compare
+        run: |
+          if [ "${{ steps.upstream.outputs.version }}" != "${{ steps.current.outputs.version }}" ]; then
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "🆕 Mise à jour disponible : ${{ steps.current.outputs.version }} → ${{ steps.upstream.outputs.version }}"
+          else
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "✅ Déjà à jour : ${{ steps.current.outputs.version }}"
+          fi
+
+      - name: Mettre à jour le PKGBUILD
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          NEW_VER="${{ steps.upstream.outputs.version }}"
+          OLD_VER="${{ steps.current.outputs.version }}"
+
+          # Mettre à jour pkgver et le tag dans source
+          sed -i "s/^pkgver=.*/pkgver=${NEW_VER}/" PKGBUILDs/low-latency-layer/PKGBUILD
+          sed -i "s/#tag=v${OLD_VER}/#tag=v${NEW_VER}/" PKGBUILDs/low-latency-layer/PKGBUILD
+          # Reset pkgrel à 1
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILDs/low-latency-layer/PKGBUILD
+
+          echo "PKGBUILD mis à jour : ${OLD_VER} → ${NEW_VER}"
+
+      - name: Builder le paquet mis à jour
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          NEW_VER="${{ steps.upstream.outputs.version }}"
+          mkdir -p repo/x86_64
+
+          docker run --rm \
+            -v "$PWD/PKGBUILDs/low-latency-layer:/build" \
+            -v "$PWD/repo/x86_64:/repo" \
+            archlinux:latest \
+            bash -c "
+              pacman -Sy --noconfirm base-devel cmake ninja vulkan-headers git 2>/dev/null | tail -3
+              useradd -m builder
+              chown -R builder:builder /build
+              su builder -c 'cd /build && makepkg -s --noconfirm --noprogressbar --skipchecksums 2>&1'
+              mv /build/*.pkg.tar.zst /repo/ 2>/dev/null || true
+            "
+
+      - name: Mettre à jour la base de données pacman
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          docker run --rm \
+            -v "$PWD/repo/x86_64:/repo" \
+            -w /repo \
+            archlinux:latest \
+            bash -c "
+              pacman -Sy --noconfirm 2>/dev/null
+              repo-add shivaos.db.tar.gz *.pkg.tar.zst
+              ln -sf shivaos.db.tar.gz shivaos.db
+              ln -sf shivaos.files.tar.gz shivaos.files
+            "
+
+      - name: Commit et push
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          git config user.name "ShivaOS Bot"
+          git config user.email "contact@shivaos.com"
+          git add PKGBUILDs/low-latency-layer/PKGBUILD repo/x86_64/
+          git commit -m "auto: low-latency-layer ${{ steps.current.outputs.version }} → ${{ steps.upstream.outputs.version }}"
+          git push
+
+      - name: Résumé
+        run: |
+          if [ "${{ steps.compare.outputs.needs_update }}" = "true" ]; then
+            echo "✅ low-latency-layer mis à jour : ${{ steps.current.outputs.version }} → ${{ steps.upstream.outputs.version }}"
+          else
+            echo "✅ low-latency-layer déjà à jour (${{ steps.current.outputs.version }})"
+          fi
