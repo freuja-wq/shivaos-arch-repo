@@ -21,6 +21,7 @@ package() {
     cat > "${pkgdir}/etc/pacman.d/shivaos.conf" << 'EOF'
 [shivaos]
 SigLevel = Optional TrustAll
+Server = https://shivaos.com/arch-repo/x86_64
 Server = https://freuja-wq.github.io/shivaos-arch-repo/x86_64
 EOF
 
