@@ -10,7 +10,7 @@ arch=('x86_64')
 url="https://github.com/Korthos-Software/low_latency_layer"
 license=('MIT')
 depends=('vulkan-icd-loader')
-makedepends=('cmake' 'vulkan-headers' 'vulkan-icd-loader' 'ninja' 'git')
+makedepends=('cmake' 'vulkan-headers' 'vulkan-icd-loader' 'vulkan-utility-libraries' 'ninja' 'git')
 source=("low_latency_layer::git+https://github.com/Korthos-Software/low_latency_layer.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 

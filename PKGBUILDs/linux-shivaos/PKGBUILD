@@ -28,7 +28,7 @@ prepare() {
     cd "linux-${_kernver}"
 
     # Appliquer le patch BORE scheduler
-    patch -p1 < "../bore-${_borever}.patch"
+    patch -p1 --fuzz=3 < "../bore-${_borever}.patch"
 
     # Utiliser la config Arch comme base
     cp "../config.x86_64" .config
