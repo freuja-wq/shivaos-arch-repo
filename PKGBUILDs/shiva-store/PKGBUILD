@@ -1,0 +1,40 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-store
+pkgver=1.9
+pkgrel=16
+pkgdesc="Shiva Commander — Gaming Hub ShivaOS"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python' 'python-pyqt6' 'flatpak')
+source=("shiva-store.py"
+        "shiva-store.svg")
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+    install -Dm755 "$srcdir/shiva-store.py" "$pkgdir/usr/share/shiva-store/shiva-store.py"
+    install -Dm644 "$srcdir/shiva-store.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/shiva-store.svg"
+
+    # Wrapper exécutable
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/shiva-store" << 'EOF'
+#!/bin/bash
+exec python3 /usr/share/shiva-store/shiva-store.py "$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/shiva-store"
+
+    # Launcher .desktop
+    install -dm755 "$pkgdir/usr/share/applications"
+    cat > "$pkgdir/usr/share/applications/shiva-store.desktop" << 'EOF'
+[Desktop Entry]
+Name=Shiva Commander
+Name[fr]=Shiva Commander
+Comment=Gaming Hub ShivaOS
+Exec=shiva-store
+Icon=shiva-store
+Terminal=false
+Type=Application
+Categories=Game;System;
+Keywords=gaming;store;apps;
+EOF
+}

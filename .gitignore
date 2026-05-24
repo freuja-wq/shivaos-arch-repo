@@ -1,0 +1,6 @@
+# Sources copiées temporairement pour le build
+PKGBUILDs/*/*.py
+PKGBUILDs/*/*.svg
+PKGBUILDs/*/*.png
+PKGBUILDs/*/src/
+PKGBUILDs/*/pkg/
