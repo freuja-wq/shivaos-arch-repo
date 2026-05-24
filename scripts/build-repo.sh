@@ -68,10 +68,18 @@ for pkgdir in "$PKGBUILDS_DIR"/*/; do
         archlinux:latest \
         bash -c "
             set -e
-            pacman -Sy --noconfirm base-devel 2>/dev/null | tail -3
+            pacman -Sy --noconfirm base-devel > /dev/null 2>&1
             useradd -m builder 2>/dev/null || true
-            chown -R builder:builder /build
-            su builder -c 'makepkg -s --noconfirm --noprogressbar --skipchecksums 2>&1'
+            echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+            cp -r /build /home/builder/pkgbuild
+            chown -R builder:builder /home/builder/pkgbuild
+            # Installer les makedepends (pas les depends runtime) en root
+            MAKEDEPS=\$(bash -c 'source /home/builder/pkgbuild/PKGBUILD 2>/dev/null && echo \"\${makedepends[*]}\"' 2>/dev/null || true)
+            [ -n \"\$MAKEDEPS\" ] && pacman -S --noconfirm --needed \$MAKEDEPS > /dev/null 2>&1 || true
+            cd /home/builder/pkgbuild
+            # -d = skip dep check (deps runtime comme shiva-core non dispo en container)
+            su builder -c 'makepkg -d --noconfirm --noprogressbar --skipchecksums 2>&1'
+            cp /home/builder/pkgbuild/*.pkg.tar.zst /build/ 2>/dev/null || true
         " && {
         # Signer et déplacer les paquets buildés
         for pkg_file in "$pkgdir"/*.pkg.tar.zst; do

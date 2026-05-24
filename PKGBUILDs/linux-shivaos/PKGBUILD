@@ -18,7 +18,7 @@ _archconfig=7.0.9.arch2-1
 
 source=(
     "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-${_kernver}.tar.xz"
-    "https://gitlab.archlinux.org/archlinux/packaging/packages/linux/-/raw/${_archconfig}/config"
+    "https://gitlab.archlinux.org/archlinux/packaging/packages/linux/-/raw/${_archconfig}/config.x86_64"
     "bore-${_borever}.patch"
     "shivaos.config"
 )
@@ -31,7 +31,7 @@ prepare() {
     patch -p1 < "../bore-${_borever}.patch"
 
     # Utiliser la config Arch comme base
-    cp "../config" .config
+    cp "../config.x86_64" .config
 
     # Désactiver les questions interactives
     scripts/config --disable DEBUG_INFO
