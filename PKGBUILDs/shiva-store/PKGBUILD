@@ -1,7 +1,7 @@
 # Maintainer: ShivaOS Team <contact@shivaos.com>
 pkgname=shiva-store
 pkgver=1.9
-pkgrel=1
+pkgrel=3
 pkgdesc="Shiva Commander — Gaming Hub ShivaOS (Arch)"
 arch=('any')
 url="https://shivaos.com"
@@ -14,84 +14,281 @@ sha256sums=('SKIP' 'SKIP')
 prepare() {
     cp "$srcdir/shiva-store.py" "$srcdir/shiva-store-arch.py"
 
-    # Remplacer is_atomic() → toujours False sur Arch
-    sed -i 's/def is_atomic():/def is_atomic():  # Arch: always False\n    return False\ndef _is_atomic_orig():/' \
-        "$srcdir/shiva-store-arch.py"
-
-    # Remplacer pkg_install_cmd() → pacman sur Arch
     python3 - "$srcdir/shiva-store-arch.py" << 'PYEOF'
-import re, sys
+import re, sys, py_compile, tempfile, os
 
 path = sys.argv[1]
 with open(path) as f:
     content = f.read()
 
-# Remplacer la fonction pkg_install_cmd
-old = r'def pkg_install_cmd\(pkgs\):.*?return \["pkexec", "dnf", "install", "-y"\] \+ pkgs'
-new = 'def pkg_install_cmd(pkgs):\n    return ["pkexec", "pacman", "-S", "--noconfirm"] + pkgs'
-content = re.sub(old, new, content, flags=re.DOTALL)
+# ── 1. is_atomic() → False ─────────────────────────────────────────
+content = re.sub(
+    r'def is_atomic\(\):\n    return os\.path\.exists\([^\)]+\)',
+    'def is_atomic():\n    return False',
+    content)
 
-# Remplacer is_installed_dnf → is_installed_pacman
+# ── 2. pkg_install_cmd() → pacman ──────────────────────────────────
+content = re.sub(
+    r'def pkg_install_cmd\(pkgs\):.*?return \["pkexec", "dnf", "install", "-y"\] \+ pkgs',
+    'def pkg_install_cmd(pkgs):\n    return ["pkexec", "pacman", "-S", "--noconfirm"] + pkgs',
+    content, flags=re.DOTALL)
+
+# ── 3. is_installed_dnf() → pacman -Q ──────────────────────────────
+content = re.sub(
+    r'def is_installed_dnf\(pkg\):.*?return r\.returncode == 0\n    except Exception:\n        return False',
+    'def is_installed_dnf(pkg):\n    try:\n        r = subprocess.run(["pacman", "-Q", pkg], capture_output=True)\n        return r.returncode == 0\n    except Exception:\n        return False',
+    content, flags=re.DOTALL)
+
+# ── 4. _fedora_chroot() → arch ─────────────────────────────────────
+content = re.sub(
+    r'def _fedora_chroot\(\):.*?return "fedora-44-x86_64"',
+    'def _fedora_chroot():\n    return "arch-x86_64"',
+    content, flags=re.DOTALL)
+
+# ── 5. _shiva_repo_args() → liste vide (full function+except) ──────
+content = re.sub(
+    r'def _shiva_repo_args\(\):.*?(?=\n(?:def |class ))',
+    'def _shiva_repo_args():\n    return []',
+    content, flags=re.DOTALL)
+
+# ── 6. RepoWorker.run() → désactivé ────────────────────────────────
 content = content.replace(
-    'def is_installed_dnf(pkg):\n    try:\n        r = subprocess.run(["rpm", "-q", pkg], capture_output=True)\n        return r.returncode == 0\n    except Exception:\n        return False',
-    'def is_installed_dnf(pkg):\n    try:\n        r = subprocess.run(["pacman", "-Q", pkg], capture_output=True)\n        return r.returncode == 0\n    except Exception:\n        return False'
+    '    def run(self):\n'
+    '        if is_atomic():\n'
+    '            self.finished.emit(False, "atomic")\n'
+    '            return\n'
+    '        cmd = ["pkexec", "dnf", "copr", self.action, "-y", self.copr]\n'
+    '        if self.action == "enable":\n'
+    '            cmd.append(_fedora_chroot())\n'
+    '        try:\n'
+    '            r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)\n'
+    '            self.finished.emit(r.returncode == 0, r.stderr.strip() or r.stdout.strip())\n'
+    '        except Exception as e:\n'
+    '            self.finished.emit(False, str(e))',
+    '    def run(self):\n'
+    '        self.finished.emit(False, "Non disponible sur Arch — repo géré via /etc/pacman.d/shivaos.conf")'
 )
 
-# Remplacer les noms de paquets Fedora → Arch
-replacements = {
-    '"akmod-nvidia-open"':         '"nvidia-open"',
-    '"xorg-x11-drv-nvidia-cuda"':  '"nvidia-utils"',
-    '"mesa-vulkan-drivers"':       '"vulkan-radeon"',
-    '"vkBasalt"':                  '"vkbasalt"',
-    '"rocm-opencl"':               '"rocm-opencl-runtime"',
-    '"rocm-hip"':                  '"hip-runtime-amd"',
-    '"akmod-nvidia-580xx"':        '"nvidia-470xx-dkms"',
-    # type dnf → pacman pour paquets système
-    '"type": "dnf"':               '"type": "pacman"',
-}
-for old_str, new_str in replacements.items():
-    content = content.replace(old_str, new_str)
+# ── 7. UpdateWorker.run() → pacman -Qu  (AVANT renommage PKGS) ─────
+content = content.replace(
+    '    def run(self):\n'
+    '        try:\n'
+    '            if is_atomic():\n'
+    '                r = subprocess.run(\n'
+    '                    ["rpm-ostree", "upgrade", "--check"],\n'
+    '                    capture_output=True, text=True, timeout=90)\n'
+    '                combined = r.stdout + r.stderr\n'
+    '                updates = []\n'
+    '                has_update = "AvailableUpdate" in combined or (\n'
+    '                    r.returncode == 0 and any(\n'
+    '                        k in combined for k in ("Version:", "Commit:", "Diff:")\n'
+    '                    )\n'
+    '                )\n'
+    '                if has_update:\n'
+    '                    for line in combined.splitlines():\n'
+    '                        line = line.strip()\n'
+    '                        if line and any(k in line for k in ("Version:", "Commit:", "Diff:", "From:")):\n'
+    '                            updates.append({"pkg": line, "ver": "", "repo": "Atomic"})\n'
+    '                self.finished.emit(updates)\n'
+    '                return\n'
+    '            # Classic : tous les paquets ShivaOS installés\n'
+    '            pkgs = _SHIVA_PKGS_CLASSIC\n'
+    '            r = subprocess.run(\n'
+    '                ["dnf", "check-update"] + pkgs + ["-q", "--color=never"],\n'
+    '                capture_output=True, text=True, timeout=60)\n'
+    '            updates = []\n'
+    '            # dnf check-update : exit 100 = mises à jour dispo, 0 = à jour\n'
+    '            if r.returncode == 100:\n'
+    '                for line in r.stdout.splitlines():\n'
+    '                    line = line.strip()\n'
+    '                    if line and not line.startswith(("Dernière", "Last", "Última", "Repo")):\n'
+    '                        parts = line.split()\n'
+    '                        if len(parts) >= 2:\n'
+    '                            updates.append({"pkg": parts[0], "ver": parts[1] if len(parts) > 1 else "", "repo": parts[2] if len(parts) > 2 else "ShivaOS"})\n'
+    '            self.finished.emit(updates)\n'
+    '        except Exception:\n'
+    '            self.finished.emit([])',
+    '    def run(self):\n'
+    '        try:\n'
+    '            pkgs = _SHIVA_PKGS_ARCH\n'
+    '            r = subprocess.run(\n'
+    '                ["pacman", "-Qu"] + pkgs,\n'
+    '                capture_output=True, text=True, timeout=60)\n'
+    '            updates = []\n'
+    '            for line in r.stdout.splitlines():\n'
+    '                parts = line.strip().split()\n'
+    '                if len(parts) >= 4:\n'
+    '                    updates.append({"pkg": parts[0], "ver": parts[3], "repo": "shivaos"})\n'
+    '            self.finished.emit(updates)\n'
+    '        except Exception:\n'
+    '            self.finished.emit([])'
+)
 
-# Remplacer section repos COPR → pacman
+# ── 8. UpgradeWorker.run() → pacman -Syu  (AVANT renommage PKGS) ───
+content = content.replace(
+    '    def run(self):\n'
+    '        try:\n'
+    '            if is_atomic():\n'
+    '                r = subprocess.run(\n'
+    '                    ["pkexec", "rpm-ostree", "upgrade"],\n'
+    '                    capture_output=True, text=True, timeout=300)\n'
+    '                msg = r.stderr.strip() or r.stdout.strip()\n'
+    '                if r.returncode == 0:\n'
+    '                    msg += "\\n\\n⚠ Redémarrez pour appliquer les mises à jour."\n'
+    '                self.finished.emit(r.returncode == 0, msg)\n'
+    '                return\n'
+    '            r = subprocess.run(\n'
+    '                ["pkexec", "dnf", "upgrade", "-y"] + _SHIVA_PKGS_CLASSIC,\n'
+    '                capture_output=True, text=True, timeout=300)\n'
+    '            self.finished.emit(r.returncode == 0, r.stderr.strip() or r.stdout.strip())\n'
+    '        except Exception as e:\n'
+    '            self.finished.emit(False, str(e))',
+    '    def run(self):\n'
+    '        try:\n'
+    '            r = subprocess.run(\n'
+    '                ["pkexec", "pacman", "-Syu", "--noconfirm"],\n'
+    '                capture_output=True, text=True, timeout=300)\n'
+    '            self.finished.emit(r.returncode == 0, r.stderr.strip() or r.stdout.strip())\n'
+    '        except Exception as e:\n'
+    '            self.finished.emit(False, str(e))'
+)
+
+# ── 8bis. KernelCheckWorker.run() → pacman -Qu linux-shivaos ───────
+content = content.replace(
+    '    def run(self):\n'
+    '        try:\n'
+    '            if is_atomic():\n'
+    '                r = subprocess.run(\n'
+    '                    ["rpm-ostree", "upgrade", "--check"],\n'
+    '                    capture_output=True, text=True, timeout=90)\n'
+    '                combined = (r.stdout + r.stderr).strip()\n'
+    '                has_update = "AvailableUpdate" in combined or "Version:" in combined\n'
+    '                if has_update:\n'
+    '                    # Extraire la version disponible\n'
+    '                    info = ""\n'
+    '                    for line in combined.splitlines():\n'
+    '                        if any(k in line for k in ("Version:", "Commit:", "Diff:")):\n'
+    '                            info += line.strip() + "\\n"\n'
+    '                    self.finished.emit(True, info.strip() or combined[:200])\n'
+    '                else:\n'
+    '                    self.finished.emit(False, combined[:200] if combined else "Aucune mise à jour.")\n'
+    '            else:\n'
+    '                # Classic : vérifier le paquet kernel ShivaOS via COPR\n'
+    '                r = subprocess.run(\n'
+    '                    ["dnf", "check-update", "kernel", "-q", "--color=never"],\n'
+    '                    capture_output=True, text=True, timeout=60)\n'
+    '                combined = (r.stdout + r.stderr).strip()\n'
+    '                # dnf check-update retourne 100 si mise à jour dispo, 0 si à jour\n'
+    '                if r.returncode == 100:\n'
+    '                    self.finished.emit(True, combined[:300] or "Nouveau kernel disponible.")\n'
+    '                else:\n'
+    '                    cur = _run_cmd(["uname", "-r"])\n'
+    '                    self.finished.emit(False, f"Kernel actuel : {cur}")\n'
+    '        except Exception as e:\n'
+    '            self.finished.emit(False, f"Erreur : {e}")',
+    '    def run(self):\n'
+    '        try:\n'
+    '            r = subprocess.run(\n'
+    '                ["pacman", "-Qu", "linux-shivaos"],\n'
+    '                capture_output=True, text=True, timeout=30)\n'
+    '            out = r.stdout.strip()\n'
+    '            if out:\n'
+    '                parts = out.split()\n'
+    '                ver = parts[3] if len(parts) >= 4 else out\n'
+    '                self.finished.emit(True, f"linux-shivaos : {ver} disponible")\n'
+    '            else:\n'
+    '                cur = _run_cmd(["uname", "-r"])\n'
+    '                self.finished.emit(False, f"Kernel actuel : {cur}")\n'
+    '        except Exception as e:\n'
+    '            self.finished.emit(False, f"Erreur : {e}")'
+)
+
+# ── 9. _SHIVA_PKGS → Arch  (APRÈS workers) ────────────────────────
+content = content.replace(
+    '_SHIVA_PKGS_CLASSIC = ["shiva-core", "shiva-ai", "shiva-pulse", "shiva-store",\n'
+    '                        "shiva-gaming", "kernel-shivaos"]',
+    '_SHIVA_PKGS_ARCH = ["shiva-core", "shiva-ai", "shiva-pulse", "shiva-store",\n'
+    '                     "shiva-ai-overlay", "shiva-welcome", "shiva-branding",\n'
+    '                     "linux-shivaos", "low-latency-layer"]'
+)
+content = content.replace(
+    '_SHIVA_PKGS_ATOMIC  = ["shiva-core", "shiva-ai", "shiva-pulse", "shiva-store",\n'
+    '                        "shiva-ai-overlay", "shiva-welcome", "shiva-branding"]',
+    ''
+)
+content = content.replace('_SHIVA_PKGS_CLASSIC', '_SHIVA_PKGS_ARCH')
+content = content.replace('_SHIVA_PKGS_ATOMIC',  '_SHIVA_PKGS_ARCH')
+
+# ── 10. Noms de paquets Fedora → Arch ─────────────────────────────
+for old_s, new_s in {
+    '"akmod-nvidia-open"':        '"nvidia-open"',
+    '"xorg-x11-drv-nvidia-cuda"': '"nvidia-utils"',
+    '"mesa-vulkan-drivers"':      '"vulkan-radeon"',
+    '"vkBasalt"':                 '"vkbasalt"',
+    '"rocm-opencl"':              '"rocm-opencl-runtime"',
+    '"rocm-hip"':                 '"hip-runtime-amd"',
+    '"akmod-nvidia-580xx"':       '"nvidia-470xx-dkms"',
+    '"kernel-shivaos"':           '"linux-shivaos"',
+    '"shiva-gaming"':             '"low-latency-layer"',
+    '"type": "dnf"':              '"type": "pacman"',
+    'REPO_DIR = "/etc/yum.repos.d"': 'REPO_DIR = "/etc/pacman.d"',
+}.items():
+    content = content.replace(old_s, new_s)
+
+# ── 11. Repos COPR → pacman ───────────────────────────────────────
 content = content.replace(
     '"files": ["shivaos.repo", "_copr:copr.fedorainfracloud.org:freuja:ShivaOs.repo"]',
-    '"files": ["/etc/pacman.d/shivaos.conf"]'
-)
-content = content.replace(
-    '"files": ["_copr:copr.fedorainfracloud.org:freuja:ShivaOs-kernel.repo"]',
-    '"files": []'
-)
-content = content.replace(
-    '"files": ["_copr:copr.fedorainfracloud.org:freuja:ShivaOs-dev.repo"]',
-    '"files": []'
-)
+    '"files": ["/etc/pacman.d/shivaos.conf"]')
+content = re.sub(r'"files": \["_copr:[^"]*"\]', '"files": []', content)
 
-# Répertoire repos Arch
-content = content.replace(
-    'REPO_DIR = "/etc/yum.repos.d"',
-    'REPO_DIR = "/etc/pacman.d"'
-)
-
-# Texte updates atomic → pacman
+# ── 12. Textes Atomic/Fedora ──────────────────────────────────────
 content = content.replace(
     "Mises à jour via l'image Atomic (rpm-ostree upgrade).",
-    "Mises à jour via pacman -Syu."
-)
+    "Mises à jour via pacman -Syu.")
 content = content.replace(
     "Updates via the Atomic image (rpm-ostree upgrade).",
-    "Updates via pacman -Syu."
-)
+    "Updates via pacman -Syu.")
 content = content.replace(
     "Actualizaciones via imagen Atomic (rpm-ostree upgrade).",
-    "Actualizaciones via pacman -Syu."
-)
+    "Actualizaciones via pacman -Syu.")
+content = content.replace(
+    '"Les mises à jour arrivent automatiquement via rpm-ostree\\n"',
+    '"Les mises à jour arrivent via pacman -Syu\\n"')
+content = content.replace(
+    '"kernel-shivaos 7.x · BORE · 1000Hz · x86-64-v3 · ntsync"',
+    '"linux-shivaos · BORE · BBR3 · 1000Hz"')
+content = content.replace(
+    '"shiva-core · shiva-ai · shiva-pulse · shiva-store · shiva-gaming"',
+    '"shiva-core · shiva-ai · shiva-pulse · shiva-store · low-latency-layer"')
 
-# Remplacer _fedora_chroot → arch
-content = content.replace('_fedora_chroot()', '"arch-x86_64"')
+# ── Vérification finale ───────────────────────────────────────────
+tmp = tempfile.NamedTemporaryFile(suffix='.py', delete=False)
+tmp.write(content.encode())
+tmp.close()
+try:
+    py_compile.compile(tmp.name, doraise=True)
+    print("✅ Syntaxe Python OK")
+except py_compile.PyCompileError as e:
+    print(f"❌ Erreur syntaxe : {e}")
+    sys.exit(1)
+finally:
+    os.unlink(tmp.name)
+
+bad = [l.strip() for l in content.split('\n')
+    if any(k in l for k in ['rpm-ostree', 'dnf install', 'dnf copr',
+                             'dnf upgrade', 'dnf check-update',
+                             'PKGS_CLASSIC', 'PKGS_ATOMIC'])
+    and not l.strip().startswith('#')
+    and 'sub_atomic' not in l and 'err_copr' not in l]
+if bad:
+    print(f"⚠️  {len(bad)} référence(s) Fedora restante(s):")
+    for l in bad[:5]: print(f"   {l}")
+else:
+    print("✅ Aucune référence Fedora/rpm-ostree restante")
 
 with open(path, 'w') as f:
     f.write(content)
-print("Patch Arch appliqué.")
+print("✅ Patch Arch complet.")
 PYEOF
 }
 
