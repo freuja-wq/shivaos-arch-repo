@@ -37,7 +37,7 @@ echo "✅ GitHub Pages pushé (dispo dans ~2 min)"
 echo ""
 echo "── FTP shivaos.com/arch-repo/ ──"
 
-for f in "$REPO_DIR"/*.pkg.tar.zst "$REPO_DIR"/*.db* "$REPO_DIR"/*.files*; do
+for f in "$REPO_DIR"/*.pkg.tar.zst "$REPO_DIR"/*.pkg.tar.zst.sig "$REPO_DIR"/*.db* "$REPO_DIR"/*.files*; do
     [ -f "$f" ] || continue
     fname=$(basename "$f")
     echo "  ↑ $fname"
@@ -47,6 +47,15 @@ for f in "$REPO_DIR"/*.pkg.tar.zst "$REPO_DIR"/*.db* "$REPO_DIR"/*.files*; do
         --ftp-create-dirs \
         --silent --show-error
 done
+
+# Clé GPG publique (racine arch-repo/)
+FTP_ARCH_ROOT="ftp://${FTP_SERVER}/shivaos.com/arch-repo"
+echo "  ↑ shivaos.gpg"
+curl --ftp-ssl -T "$ARCH_DIR/repo/shivaos.gpg" \
+    "${FTP_ARCH_ROOT}/shivaos.gpg" \
+    --user "${FTP_USER}:${FTP_PASS}" \
+    --ftp-create-dirs \
+    --silent --show-error
 
 echo "✅ FTP pushé"
 
