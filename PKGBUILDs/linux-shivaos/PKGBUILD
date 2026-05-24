@@ -1,0 +1,132 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgbase=linux-shivaos
+pkgname=('linux-shivaos' 'linux-shivaos-headers')
+pkgver=7.0.9
+pkgrel=1
+pkgdesc="Linux kernel avec BORE scheduler + BBR3 — ShivaOS Gaming"
+arch=('x86_64')
+url="https://shivaos.com"
+license=('GPL2')
+makedepends=('bc' 'cpio' 'gettext' 'libelf' 'pahole' 'perl' 'python' 'tar' 'xz' 'zstd')
+options=('!strip')
+provides=('linux' 'linux-headers')
+conflicts=('linux' 'linux-headers')
+
+_kernver=7.0.9
+_borever=7.0
+_archconfig=7.0.9.arch2-1
+
+source=(
+    "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-${_kernver}.tar.xz"
+    "https://gitlab.archlinux.org/archlinux/packaging/packages/linux/-/raw/${_archconfig}/config"
+    "bore-${_borever}.patch"
+    "shivaos.config"
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+prepare() {
+    cd "linux-${_kernver}"
+
+    # Appliquer le patch BORE scheduler
+    patch -p1 < "../bore-${_borever}.patch"
+
+    # Utiliser la config Arch comme base
+    cp "../config" .config
+
+    # Désactiver les questions interactives
+    scripts/config --disable DEBUG_INFO
+    scripts/config --disable DEBUG_INFO_BTF
+    scripts/config --disable DEBUG_INFO_DWARF4
+    scripts/config --disable DEBUG_INFO_DWARF5
+
+    # Appliquer nos configs gaming (BORE + BBR3)
+    while IFS= read -r line; do
+        [[ "$line" =~ ^#.*not\ set$ ]] && {
+            key="${line#\# }"; key="${key%% *}"
+            scripts/config --disable "$key"
+            continue
+        }
+        [[ "$line" =~ ^CONFIG_ ]] && {
+            key="${line%%=*}"
+            val="${line#*=}"
+            scripts/config --set-val "$key" "$val"
+        }
+    done < "../shivaos.config"
+
+    make olddefconfig
+    diff -u "../config" .config || true
+}
+
+build() {
+    cd "linux-${_kernver}"
+    make -j$(nproc) all
+}
+
+package_linux-shivaos() {
+    pkgdesc="Linux kernel BORE ShivaOS — ${pkgver}"
+    depends=('coreutils' 'initramfs' 'kmod')
+    optdepends=('linux-firmware: firmware pour hardware')
+    provides=('linux' 'VIRTUALBOX-GUEST-MODULES' 'WIREGUARD-MODULE')
+    conflicts=('linux')
+    install=linux-shivaos.install
+    backup=("etc/mkinitcpio.d/${pkgbase}.preset")
+
+    cd "linux-${_kernver}"
+    local kernver="$(make -s kernelrelease)"
+    local modulesdir="${pkgdir}/usr/lib/modules/${kernver}"
+
+    install -Dm644 "$(make -s image_name)" "${modulesdir}/vmlinuz"
+    install -Dm644 System.map "${modulesdir}/System.map"
+    install -Dm644 .config "${modulesdir}/config"
+    echo "${pkgbase}" | install -Dm644 /dev/stdin "${modulesdir}/pkgbase"
+
+    make INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 modules_install
+    rm "${modulesdir}/source" "${modulesdir}/build"
+
+    # mkinitcpio preset
+    install -Dm644 /dev/stdin "${pkgdir}/etc/mkinitcpio.d/${pkgbase}.preset" << EOF
+ALL_config="/etc/mkinitcpio.conf"
+ALL_kver="/boot/vmlinuz-${pkgbase}"
+PRESETS=('default' 'fallback')
+default_image="/boot/initramfs-${pkgbase}.img"
+fallback_options="-S autodetect"
+fallback_image="/boot/initramfs-${pkgbase}-fallback.img"
+EOF
+
+    # vmlinuz dans /boot
+    install -Dm644 "$(make -s image_name)" "${pkgdir}/boot/vmlinuz-${pkgbase}"
+}
+
+package_linux-shivaos-headers() {
+    pkgdesc="Headers pour linux-shivaos"
+    provides=('linux-headers')
+    conflicts=('linux-headers')
+
+    cd "linux-${_kernver}"
+    local builddir="${pkgdir}/usr/lib/modules/$(make -s kernelrelease)/build"
+
+    install -Dt "${builddir}" -m644 .config Makefile Module.symvers System.map vmlinux \
+        vmlinux.h 2>/dev/null || install -Dt "${builddir}" -m644 .config Makefile Module.symvers System.map vmlinux
+    install -Dt "${builddir}/kernel" -m644 kernel/Makefile
+    install -Dt "${builddir}/arch/x86" -m644 arch/x86/Makefile
+    cp -t "${builddir}" -a scripts
+    cp -t "${builddir}" -a tools/objtool
+
+    install -Dt "${builddir}/tools/objtool" tools/objtool/objtool
+    install -Dt "${builddir}/tools/bpf/resolve_btfids" tools/bpf/resolve_btfids/resolve_btfids 2>/dev/null || true
+
+    find . -name 'Kconfig*' | while read -r file; do
+        install -Dm644 "${file}" "${builddir}/${file#./}"
+    done
+
+    find . -name '*.h' -path '*/arch/x86/*' | while read -r file; do
+        install -Dm644 "${file}" "${builddir}/${file#./}"
+    done
+
+    install -Dt "${builddir}/drivers/md" -m644 drivers/md/*.h
+    install -Dt "${builddir}/net/mac80211" -m644 net/mac80211/*.h
+    install -Dt "${builddir}/drivers/media/i2c" -m644 drivers/media/i2c/msp3400-driver.h 2>/dev/null || true
+    install -Dt "${builddir}/drivers/media/usb/dvb-usb" -m644 drivers/media/usb/dvb-usb/*.h 2>/dev/null || true
+
+    ln -sr "${builddir}" "${pkgdir}/usr/src/linux-${pkgbase}"
+}

@@ -1,0 +1,42 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-amd
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS AMD — Interface PyQt6 gestion GPU AMD"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python' 'python-pyqt6')
+optdepends=(
+    'lact: alternative GPU control'
+    'radeontop: monitoring GPU AMD'
+    'corectrl: profils GPU AMD avancés'
+)
+source=("shiva-amd.py" "shiva-amd.svg")
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+    install -Dm755 "$srcdir/shiva-amd.py" \
+        "$pkgdir/usr/share/shiva-amd/shiva-amd.py"
+    install -Dm644 "$srcdir/shiva-amd.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/shiva-amd.svg"
+
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/shiva-amd" << 'EOF'
+#!/bin/bash
+exec python3 /usr/share/shiva-amd/shiva-amd.py "$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/shiva-amd"
+
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/shiva-amd.desktop" << 'EOF'
+[Desktop Entry]
+Name=Shiva AMD
+Comment=Gestion GPU AMD ShivaOS
+Exec=shiva-amd
+Icon=shiva-amd
+Terminal=false
+Type=Application
+Categories=System;Settings;
+Keywords=gpu;amd;radeon;performance;
+EOF
+}

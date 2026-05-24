@@ -1,0 +1,43 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-nvidia
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS NVIDIA — Interface PyQt6 gestion pilotes NVIDIA (Arch)"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python' 'python-pyqt6')
+optdepends=(
+    'nvidia: pilote propriétaire (GTX 1060+)'
+    'nvidia-open: pilote open source (RTX 2000+)'
+    'nvidia-470xx-dkms: pilote legacy GTX 900/1000 (AUR)'
+    'nvtop: monitoring GPU NVIDIA'
+)
+source=("shiva-nvidia.py" "shiva-nvidia.svg")
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+    install -Dm755 "$srcdir/shiva-nvidia.py" \
+        "$pkgdir/usr/share/shiva-nvidia/shiva-nvidia.py"
+    install -Dm644 "$srcdir/shiva-nvidia.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/shiva-nvidia.svg"
+
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/shiva-nvidia" << 'EOF'
+#!/bin/bash
+exec python3 /usr/share/shiva-nvidia/shiva-nvidia.py "$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/shiva-nvidia"
+
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/shiva-nvidia.desktop" << 'EOF'
+[Desktop Entry]
+Name=Shiva NVIDIA
+Comment=Gestion pilotes NVIDIA ShivaOS
+Exec=shiva-nvidia
+Icon=shiva-nvidia
+Terminal=false
+Type=Application
+Categories=System;Settings;
+Keywords=gpu;nvidia;driver;
+EOF
+}

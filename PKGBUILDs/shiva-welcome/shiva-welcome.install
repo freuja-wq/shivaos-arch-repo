@@ -1,0 +1,17 @@
+post_install() {
+    # Copier autostart pour les users existants
+    for home in /home/*/; do
+        [ -d "$home" ] || continue
+        username=$(basename "$home")
+        id "$username" >/dev/null 2>&1 || continue
+        mkdir -p "$home/.config/autostart"
+        if [ ! -f "$home/.config/autostart/shiva-welcome.desktop" ]; then
+            cp /etc/skel/.config/autostart/shiva-welcome.desktop \
+               "$home/.config/autostart/" 2>/dev/null || true
+            chown "$username:$username" \
+               "$home/.config/autostart/shiva-welcome.desktop" 2>/dev/null || true
+        fi
+    done
+}
+
+post_upgrade() { post_install; }

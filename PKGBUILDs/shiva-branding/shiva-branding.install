@@ -1,0 +1,16 @@
+post_install() {
+    # Plymouth thème par défaut
+    plymouth-set-default-theme shivaos 2>/dev/null || true
+    # Mettre à jour initramfs avec Plymouth
+    mkinitcpio -P 2>/dev/null || true
+    # Service SDDM layout
+    systemctl enable shivaos-greeter-setup.service 2>/dev/null || true
+    # Mettre à jour cache icônes
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    gtk-update-icon-cache -f -t /usr/share/icons/shivaos 2>/dev/null || true
+    echo "ShivaOS Branding installé."
+}
+post_upgrade() { post_install; }
+pre_remove() {
+    systemctl disable shivaos-greeter-setup.service 2>/dev/null || true
+}

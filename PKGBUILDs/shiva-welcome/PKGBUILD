@@ -1,0 +1,47 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-welcome
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS Welcome — Wizard premier boot (6 étapes)"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python' 'python-pyqt6' 'shiva-branding')
+source=("shiva-welcome.py")
+sha256sums=('SKIP')
+install=shiva-welcome.install
+
+package() {
+    install -Dm755 "$srcdir/shiva-welcome.py" \
+        "$pkgdir/usr/share/shiva-welcome/shiva-welcome.py"
+
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/shiva-welcome" << 'EOF'
+#!/bin/bash
+exec python3 /usr/share/shiva-welcome/shiva-welcome.py "$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/shiva-welcome"
+
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/shiva-welcome.desktop" << 'EOF'
+[Desktop Entry]
+Name=ShivaOS Welcome
+Comment=Wizard premier démarrage ShivaOS
+Exec=shiva-welcome
+Icon=shivaos-logo
+Terminal=false
+Type=Application
+Categories=System;
+EOF
+
+    # Autostart au premier boot
+    install -dm755 "$pkgdir/etc/skel/.config/autostart"
+    cat > "$pkgdir/etc/skel/.config/autostart/shiva-welcome.desktop" << 'EOF'
+[Desktop Entry]
+Name=ShivaOS Welcome
+Exec=shiva-welcome
+Icon=shivaos-logo
+Terminal=false
+Type=Application
+X-KDE-autostart-condition=shiva-welcome:General:firstrun:true
+EOF
+}

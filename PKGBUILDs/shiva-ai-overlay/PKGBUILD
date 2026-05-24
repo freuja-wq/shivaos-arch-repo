@@ -1,0 +1,42 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-ai-overlay
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS AI Overlay — Fenêtre IA flottante PyQt6 (Super+A)"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python' 'python-pyqt6' 'shiva-core')
+source=("shiva-ai-overlay.py")
+sha256sums=('SKIP')
+
+package() {
+    install -Dm755 "$srcdir/shiva-ai-overlay.py" \
+        "$pkgdir/usr/share/shiva-ai-overlay/shiva-ai-overlay.py"
+
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/shiva-ai-overlay" << 'EOF'
+#!/bin/bash
+exec python3 /usr/share/shiva-ai-overlay/shiva-ai-overlay.py "$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/shiva-ai-overlay"
+
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/shiva-ai-overlay.desktop" << 'EOF'
+[Desktop Entry]
+Name=Shiva AI Overlay
+Comment=Overlay IA flottant ShivaOS
+Exec=shiva-ai-overlay
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Utility;
+NoDisplay=true
+EOF
+
+    # Raccourci KDE Super+A via kglobalshortcutsrc skel
+    install -dm755 "$pkgdir/etc/skel/.config"
+    cat > "$pkgdir/etc/skel/.config/kglobalshortcutsrc" << 'EOF'
+[shiva-ai-overlay.desktop]
+_launch=Meta+A,none,Shiva AI Overlay
+EOF
+}

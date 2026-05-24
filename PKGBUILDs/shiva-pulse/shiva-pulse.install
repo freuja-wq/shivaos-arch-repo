@@ -1,0 +1,9 @@
+post_install() {
+    systemctl enable shiva-pulse.timer 2>/dev/null || true
+    systemctl start shiva-pulse.timer 2>/dev/null || true
+}
+post_upgrade() { post_install; }
+pre_remove() {
+    systemctl disable shiva-pulse.timer 2>/dev/null || true
+    systemctl stop shiva-pulse.timer 2>/dev/null || true
+}

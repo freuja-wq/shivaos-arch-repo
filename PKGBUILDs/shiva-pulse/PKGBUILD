@@ -1,0 +1,41 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-pulse
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS — Heartbeat anonyme (compteur users live)"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python')
+source=("shiva-pulse.py")
+sha256sums=('SKIP')
+
+package() {
+    install -Dm755 "$srcdir/shiva-pulse.py" "$pkgdir/usr/lib/shiva/shiva-pulse.py"
+
+    install -dm755 "$pkgdir/usr/lib/systemd/system"
+
+    cat > "$pkgdir/usr/lib/systemd/system/shiva-pulse.service" << 'EOF'
+[Unit]
+Description=ShivaOS Heartbeat Pulse
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/lib/shiva/shiva-pulse.py
+EOF
+
+    cat > "$pkgdir/usr/lib/systemd/system/shiva-pulse.timer" << 'EOF'
+[Unit]
+Description=ShivaOS Pulse Timer (horaire)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+}

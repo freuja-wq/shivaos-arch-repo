@@ -1,0 +1,15 @@
+#!/bin/bash
+# ShivaOS Arch — Script d'installation guidée
+# Lance Calamares si présent, sinon guide texte
+
+if command -v calamares &>/dev/null; then
+    exec calamares
+else
+    echo "======================================"
+    echo "  ShivaOS Arch — Installation"
+    echo "======================================"
+    echo ""
+    echo "Calamares non trouvé. Utilise archinstall :"
+    echo ""
+    exec archinstall
+fi

@@ -1,0 +1,266 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-branding
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS — Wallpapers, icônes, SDDM, Plymouth, branding KDE"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('plasma-desktop' 'sddm' 'plymouth')
+install=shiva-branding.install
+source=(
+    "shivaos-wallpaper.png"
+    "shivaos-wallpaper-1920x1080.png"
+    "shivaos-wallpaper-2560x1440.png"
+    "shivaos-wallpaper-3440x1440.png"
+    "shivaos-logo.png"
+    "shivaos-logo-64.png"
+    "shivaos-logo-128.png"
+    "shivaos-logo-256.png"
+    "shivaos-logo-512.png"
+    "shivaos.plymouth"
+    "shivaos.script"
+    "shivaos-plymouth-logo-256.png"
+    "shivaos-sddm-Main.qml"
+    "shivaos-neon-grid-1920x1080.png"
+    "shivaos-neon-grid-3440x1440.png"
+    "shivaos-deep-space-1920x1080.png"
+    "shivaos-deep-space-3440x1440.png"
+    "shivaos-lava-core-1920x1080.png"
+    "shivaos-lava-core-3440x1440.png"
+    "shivaos-cyber-rain-1920x1080.png"
+    "shivaos-cyber-rain-3440x1440.png"
+    "shivaos-aurora-1920x1080.png"
+    "shivaos-aurora-3440x1440.png"
+    "shivaos-void-1920x1080.png"
+    "shivaos-void-3440x1440.png"
+    "shivaos-manga-01.jpg" "shivaos-manga-02.jpg" "shivaos-manga-03.jpg"
+    "shivaos-manga-04.jpg" "shivaos-manga-05.jpg" "shivaos-manga-06.jpg"
+    "shivaos-manga-07.jpg" "shivaos-manga-08.jpg" "shivaos-manga-09.jpg"
+    "shivaos-manga-10.jpg" "shivaos-manga-11.jpg" "shivaos-manga-12.jpg"
+    "shivaos-manga-13.jpg"
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP')
+
+package() {
+    # ── 1. Wallpapers KDE ─────────────────────────────────────────
+    install -dm755 "$pkgdir/usr/share/wallpapers/ShivaOS/contents/images"
+    install -m644 "$srcdir/shivaos-wallpaper.png" \
+        "$pkgdir/usr/share/wallpapers/ShivaOS/contents/images/shivaos-wallpaper.png"
+    install -m644 "$srcdir/shivaos-wallpaper-1920x1080.png" \
+        "$pkgdir/usr/share/wallpapers/ShivaOS/contents/images/1920x1080.png"
+    install -m644 "$srcdir/shivaos-wallpaper-2560x1440.png" \
+        "$pkgdir/usr/share/wallpapers/ShivaOS/contents/images/2560x1440.png"
+    install -m644 "$srcdir/shivaos-wallpaper-3440x1440.png" \
+        "$pkgdir/usr/share/wallpapers/ShivaOS/contents/images/3440x1440.png"
+
+    install -Dm644 /dev/stdin \
+        "$pkgdir/usr/share/wallpapers/ShivaOS/metadata.json" << 'EOF'
+{"KPlugin":{"Authors":[{"Name":"ShivaOS Team","Email":"contact@shivaos.com"}],"Id":"ShivaOS","License":"CC-BY-SA","Name":"ShivaOS — The Forge","Version":"1.0"}}
+EOF
+
+    # ── 1b. Wallpapers thématiques ───────────────────────────────
+    for NAME in neon-grid deep-space lava-core cyber-rain aurora void; do
+        install -dm755 "$pkgdir/usr/share/wallpapers/ShivaOS-${NAME}/contents/images"
+        printf '{"KPlugin":{"Authors":[{"Name":"ShivaOS Team","Email":"contact@shivaos.com"}],"Id":"ShivaOS-%s","License":"CC-BY-SA","Name":"ShivaOS — %s","Version":"1.0"}}\n' \
+            "$NAME" "$NAME" > "$pkgdir/usr/share/wallpapers/ShivaOS-${NAME}/metadata.json"
+    done
+    install -m644 "$srcdir/shivaos-neon-grid-1920x1080.png"  "$pkgdir/usr/share/wallpapers/ShivaOS-neon-grid/contents/images/"
+    install -m644 "$srcdir/shivaos-neon-grid-3440x1440.png"  "$pkgdir/usr/share/wallpapers/ShivaOS-neon-grid/contents/images/"
+    install -m644 "$srcdir/shivaos-deep-space-1920x1080.png" "$pkgdir/usr/share/wallpapers/ShivaOS-deep-space/contents/images/"
+    install -m644 "$srcdir/shivaos-deep-space-3440x1440.png" "$pkgdir/usr/share/wallpapers/ShivaOS-deep-space/contents/images/"
+    install -m644 "$srcdir/shivaos-lava-core-1920x1080.png"  "$pkgdir/usr/share/wallpapers/ShivaOS-lava-core/contents/images/"
+    install -m644 "$srcdir/shivaos-lava-core-3440x1440.png"  "$pkgdir/usr/share/wallpapers/ShivaOS-lava-core/contents/images/"
+    install -m644 "$srcdir/shivaos-cyber-rain-1920x1080.png" "$pkgdir/usr/share/wallpapers/ShivaOS-cyber-rain/contents/images/"
+    install -m644 "$srcdir/shivaos-cyber-rain-3440x1440.png" "$pkgdir/usr/share/wallpapers/ShivaOS-cyber-rain/contents/images/"
+    install -m644 "$srcdir/shivaos-aurora-1920x1080.png"     "$pkgdir/usr/share/wallpapers/ShivaOS-aurora/contents/images/"
+    install -m644 "$srcdir/shivaos-aurora-3440x1440.png"     "$pkgdir/usr/share/wallpapers/ShivaOS-aurora/contents/images/"
+    install -m644 "$srcdir/shivaos-void-1920x1080.png"       "$pkgdir/usr/share/wallpapers/ShivaOS-void/contents/images/"
+    install -m644 "$srcdir/shivaos-void-3440x1440.png"       "$pkgdir/usr/share/wallpapers/ShivaOS-void/contents/images/"
+
+    # ── 1c. Wallpapers manga ─────────────────────────────────────
+    for i in $(seq -w 1 13); do
+        N=$(printf "%02d" $i)
+        install -dm755 "$pkgdir/usr/share/wallpapers/ShivaOS-manga-${N}/contents/images"
+        printf '{"KPlugin":{"Authors":[{"Name":"ShivaOS Team","Email":"contact@shivaos.com"}],"Id":"ShivaOS-manga-%s","License":"CC-BY-SA","Name":"ShivaOS Manga %s","Version":"1.0"}}\n' \
+            "$N" "$N" > "$pkgdir/usr/share/wallpapers/ShivaOS-manga-${N}/metadata.json"
+        install -m644 "$srcdir/shivaos-manga-${N}.jpg" \
+            "$pkgdir/usr/share/wallpapers/ShivaOS-manga-${N}/contents/images/"
+    done
+
+    # ── 2. Icônes logo ShivaOS ────────────────────────────────────
+    install -Dm644 "$srcdir/shivaos-logo-64.png"  \
+        "$pkgdir/usr/share/icons/hicolor/64x64/apps/shivaos-logo.png"
+    install -Dm644 "$srcdir/shivaos-logo-128.png" \
+        "$pkgdir/usr/share/icons/hicolor/128x128/apps/shivaos-logo.png"
+    install -Dm644 "$srcdir/shivaos-logo-256.png" \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/shivaos-logo.png"
+    install -Dm644 "$srcdir/shivaos-logo-512.png" \
+        "$pkgdir/usr/share/icons/hicolor/512x512/apps/shivaos-logo.png"
+    install -Dm644 "$srcdir/shivaos-logo.png" \
+        "$pkgdir/usr/share/pixmaps/shivaos-logo.png"
+
+    # Thème d'icônes shivaos (start-here + distributor-logo)
+    install -dm755 "$pkgdir/usr/share/icons/shivaos/places/64"
+    install -dm755 "$pkgdir/usr/share/icons/shivaos/places/128"
+    install -Dm644 "$srcdir/shivaos-logo-64.png"  \
+        "$pkgdir/usr/share/icons/shivaos/places/64/start-here.png"
+    install -Dm644 "$srcdir/shivaos-logo-128.png" \
+        "$pkgdir/usr/share/icons/shivaos/places/128/start-here.png"
+    install -Dm644 "$srcdir/shivaos-logo-64.png"  \
+        "$pkgdir/usr/share/icons/shivaos/places/64/distributor-logo.png"
+    install -Dm644 "$srcdir/shivaos-logo-128.png" \
+        "$pkgdir/usr/share/icons/shivaos/places/128/distributor-logo.png"
+    install -Dm644 /dev/stdin \
+        "$pkgdir/usr/share/icons/shivaos/index.theme" << 'EOF'
+[Icon Theme]
+Name=shivaos
+Comment=ShivaOS Icon Theme
+Inherits=breeze,hicolor
+Directories=places/64,places/128
+
+[places/64]
+Size=64
+Context=Places
+Type=Fixed
+
+[places/128]
+Size=128
+Context=Places
+Type=Fixed
+EOF
+
+    # ── 3. SDDM thème ────────────────────────────────────────────
+    install -dm755 "$pkgdir/usr/share/sddm/themes/shivaos"
+    install -m644 "$srcdir/shivaos-wallpaper-1920x1080.png" \
+        "$pkgdir/usr/share/sddm/themes/shivaos/background.png"
+    install -m644 "$srcdir/shivaos-logo-128.png" \
+        "$pkgdir/usr/share/sddm/themes/shivaos/shivaos-logo-128.png"
+    install -m644 "$srcdir/shivaos-sddm-Main.qml" \
+        "$pkgdir/usr/share/sddm/themes/shivaos/Main.qml"
+    cat > "$pkgdir/usr/share/sddm/themes/shivaos/metadata.desktop" << 'EOF'
+[SddmGreeterTheme]
+Name=ShivaOS
+Description=ShivaOS SDDM Theme
+Author=ShivaOS Team
+License=MIT
+Type=sddm-theme
+Version=1.0
+EOF
+
+    install -dm755 "$pkgdir/usr/lib/sddm/sddm.conf.d"
+    cat > "$pkgdir/usr/lib/sddm/sddm.conf.d/shivaos.conf" << 'EOF'
+[Theme]
+Current=shivaos
+EOF
+
+    # ── 4. Plymouth thème ────────────────────────────────────────
+    install -dm755 "$pkgdir/usr/share/plymouth/themes/shivaos"
+    install -m644 "$srcdir/shivaos.plymouth" \
+        "$pkgdir/usr/share/plymouth/themes/shivaos/shivaos.plymouth"
+    install -m644 "$srcdir/shivaos.script" \
+        "$pkgdir/usr/share/plymouth/themes/shivaos/shivaos.script"
+    install -m644 "$srcdir/shivaos-plymouth-logo-256.png" \
+        "$pkgdir/usr/share/plymouth/themes/shivaos/shivaos-logo-256.png"
+
+    # ── 5. Fastfetch logo ASCII ShivaOS ─────────────────────────
+    install -dm755 "$pkgdir/usr/share/fastfetch"
+    cat > "$pkgdir/usr/share/fastfetch/shivaos.txt" << 'EOF'
+${c1}    ███████╗██╗  ██╗██╗██╗   ██╗ █████╗  ██████╗ ███████╗
+    ██╔════╝██║  ██║██║██║   ██║██╔══██╗██╔═══██╗██╔════╝
+    ███████╗███████║██║██║   ██║███████║██║   ██║███████╗
+    ╚════██║██╔══██║██║╚██╗ ██╔╝██╔══██║██║   ██║╚════██║
+    ███████║██║  ██║██║ ╚████╔╝ ██║  ██║╚██████╔╝███████║
+    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+${c2}         Pure Gaming Ecosystem — Arch Rolling
+EOF
+
+    install -Dm644 /dev/stdin \
+        "$pkgdir/etc/fastfetch/config.jsonc" << 'EOF'
+{
+    "logo": {
+        "source": "/usr/share/fastfetch/shivaos.txt",
+        "color": {"1": "blue", "2": "cyan"}
+    },
+    "display": {"separator": " "},
+    "modules": [
+        "title", "separator",
+        {"type": "os", "key": "OS"},
+        {"type": "kernel", "key": "Kernel"},
+        {"type": "packages", "key": "Packages"},
+        {"type": "de", "key": "DE"},
+        {"type": "wm", "key": "WM"},
+        {"type": "cpu", "key": "CPU"},
+        {"type": "gpu", "key": "GPU"},
+        {"type": "memory", "key": "RAM"},
+        {"type": "disk", "key": "Disk"},
+        "separator", "colors"
+    ]
+}
+EOF
+
+    # ── 6. KDE defaults skel ─────────────────────────────────────
+    install -dm755 "$pkgdir/etc/skel/.config"
+    cat > "$pkgdir/etc/skel/.config/kdeglobals" << 'EOF'
+[General]
+ColorScheme=BreezeDark
+
+[Icons]
+Theme=shivaos
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop
+EOF
+
+    # ── 7. Service setup SDDM layout clavier ────────────────────
+    install -dm755 "$pkgdir/usr/lib/systemd/system"
+    cat > "$pkgdir/usr/lib/systemd/system/shivaos-greeter-setup.service" << 'EOF'
+[Unit]
+Description=ShivaOS SDDM Greeter Setup (layout clavier)
+Before=sddm.service display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '\
+    XKBLAYOUT=$(grep ^XKBLAYOUT /etc/vconsole.conf 2>/dev/null | cut -d= -f2 | tr -d "\""  || echo "us"); \
+    XKBMODEL=$(grep ^XKBMODEL /etc/vconsole.conf 2>/dev/null | cut -d= -f2 | tr -d "\"" || echo "pc105"); \
+    mkdir -p /var/lib/sddm/.config; \
+    printf "[Layout]\nLayoutList=%s\nModel=%s\nVariantList=\n" "$XKBLAYOUT" "$XKBMODEL" > /var/lib/sddm/.config/kxkbrc; \
+    chown sddm:sddm /var/lib/sddm/.config /var/lib/sddm/.config/kxkbrc 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # ── 8. Script kickoff icon autostart ─────────────────────────
+    install -Dm755 /dev/stdin \
+        "$pkgdir/usr/libexec/shivaos-kickoff-icon" << 'EOF'
+#!/bin/bash
+STAMP="$HOME/.local/share/shivaos/.kickoff-branded"
+[ -f "$STAMP" ] && exit 0
+kwriteconfig6 --file kdeglobals --group Icons --key Theme shivaos
+for qdbus in qdbus-qt6 qdbus6 qdbus; do
+    command -v "$qdbus" &>/dev/null || continue
+    "$qdbus" org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+        "var ps=panels();for(var i=0;i<ps.length;i++){var ws=ps[i].widgets();for(var j=0;j<ws.length;j++){if(ws[j].type==='org.kde.plasma.kickoff'){ws[j].writeConfig('icon','shivaos-logo');ws[j].reloadConfig();}}}" \
+        2>/dev/null && break
+done
+mkdir -p "$(dirname "$STAMP")" && touch "$STAMP"
+EOF
+
+    install -dm755 "$pkgdir/etc/skel/.config/autostart"
+    cat > "$pkgdir/etc/skel/.config/autostart/shivaos-kickoff-icon.desktop" << 'EOF'
+[Desktop Entry]
+Name=ShivaOS Kickoff Icon Setup
+Exec=/usr/libexec/shivaos-kickoff-icon
+Terminal=false
+Type=Application
+X-KDE-autostart-phase=2
+NoDisplay=true
+EOF
+}

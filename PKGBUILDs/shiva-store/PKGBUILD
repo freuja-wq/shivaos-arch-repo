@@ -1,8 +1,8 @@
 # Maintainer: ShivaOS Team <contact@shivaos.com>
 pkgname=shiva-store
 pkgver=1.9
-pkgrel=16
-pkgdesc="Shiva Commander — Gaming Hub ShivaOS"
+pkgrel=1
+pkgdesc="Shiva Commander — Gaming Hub ShivaOS (Arch)"
 arch=('any')
 url="https://shivaos.com"
 license=('MIT')
@@ -11,11 +11,96 @@ source=("shiva-store.py"
         "shiva-store.svg")
 sha256sums=('SKIP' 'SKIP')
 
-package() {
-    install -Dm755 "$srcdir/shiva-store.py" "$pkgdir/usr/share/shiva-store/shiva-store.py"
-    install -Dm644 "$srcdir/shiva-store.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/shiva-store.svg"
+prepare() {
+    cp "$srcdir/shiva-store.py" "$srcdir/shiva-store-arch.py"
 
-    # Wrapper exécutable
+    # Remplacer is_atomic() → toujours False sur Arch
+    sed -i 's/def is_atomic():/def is_atomic():  # Arch: always False\n    return False\ndef _is_atomic_orig():/' \
+        "$srcdir/shiva-store-arch.py"
+
+    # Remplacer pkg_install_cmd() → pacman sur Arch
+    python3 - "$srcdir/shiva-store-arch.py" << 'PYEOF'
+import re, sys
+
+path = sys.argv[1]
+with open(path) as f:
+    content = f.read()
+
+# Remplacer la fonction pkg_install_cmd
+old = r'def pkg_install_cmd\(pkgs\):.*?return \["pkexec", "dnf", "install", "-y"\] \+ pkgs'
+new = 'def pkg_install_cmd(pkgs):\n    return ["pkexec", "pacman", "-S", "--noconfirm"] + pkgs'
+content = re.sub(old, new, content, flags=re.DOTALL)
+
+# Remplacer is_installed_dnf → is_installed_pacman
+content = content.replace(
+    'def is_installed_dnf(pkg):\n    try:\n        r = subprocess.run(["rpm", "-q", pkg], capture_output=True)\n        return r.returncode == 0\n    except Exception:\n        return False',
+    'def is_installed_dnf(pkg):\n    try:\n        r = subprocess.run(["pacman", "-Q", pkg], capture_output=True)\n        return r.returncode == 0\n    except Exception:\n        return False'
+)
+
+# Remplacer les noms de paquets Fedora → Arch
+replacements = {
+    '"akmod-nvidia-open"':         '"nvidia-open"',
+    '"xorg-x11-drv-nvidia-cuda"':  '"nvidia-utils"',
+    '"mesa-vulkan-drivers"':       '"vulkan-radeon"',
+    '"vkBasalt"':                  '"vkbasalt"',
+    '"rocm-opencl"':               '"rocm-opencl-runtime"',
+    '"rocm-hip"':                  '"hip-runtime-amd"',
+    '"akmod-nvidia-580xx"':        '"nvidia-470xx-dkms"',
+    # type dnf → pacman pour paquets système
+    '"type": "dnf"':               '"type": "pacman"',
+}
+for old_str, new_str in replacements.items():
+    content = content.replace(old_str, new_str)
+
+# Remplacer section repos COPR → pacman
+content = content.replace(
+    '"files": ["shivaos.repo", "_copr:copr.fedorainfracloud.org:freuja:ShivaOs.repo"]',
+    '"files": ["/etc/pacman.d/shivaos.conf"]'
+)
+content = content.replace(
+    '"files": ["_copr:copr.fedorainfracloud.org:freuja:ShivaOs-kernel.repo"]',
+    '"files": []'
+)
+content = content.replace(
+    '"files": ["_copr:copr.fedorainfracloud.org:freuja:ShivaOs-dev.repo"]',
+    '"files": []'
+)
+
+# Répertoire repos Arch
+content = content.replace(
+    'REPO_DIR = "/etc/yum.repos.d"',
+    'REPO_DIR = "/etc/pacman.d"'
+)
+
+# Texte updates atomic → pacman
+content = content.replace(
+    "Mises à jour via l'image Atomic (rpm-ostree upgrade).",
+    "Mises à jour via pacman -Syu."
+)
+content = content.replace(
+    "Updates via the Atomic image (rpm-ostree upgrade).",
+    "Updates via pacman -Syu."
+)
+content = content.replace(
+    "Actualizaciones via imagen Atomic (rpm-ostree upgrade).",
+    "Actualizaciones via pacman -Syu."
+)
+
+# Remplacer _fedora_chroot → arch
+content = content.replace('_fedora_chroot()', '"arch-x86_64"')
+
+with open(path, 'w') as f:
+    f.write(content)
+print("Patch Arch appliqué.")
+PYEOF
+}
+
+package() {
+    install -Dm755 "$srcdir/shiva-store-arch.py" \
+        "$pkgdir/usr/share/shiva-store/shiva-store.py"
+    install -Dm644 "$srcdir/shiva-store.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/shiva-store.svg"
+
     install -dm755 "$pkgdir/usr/bin"
     cat > "$pkgdir/usr/bin/shiva-store" << 'EOF'
 #!/bin/bash
@@ -23,9 +108,7 @@ exec python3 /usr/share/shiva-store/shiva-store.py "$@"
 EOF
     chmod 755 "$pkgdir/usr/bin/shiva-store"
 
-    # Launcher .desktop
-    install -dm755 "$pkgdir/usr/share/applications"
-    cat > "$pkgdir/usr/share/applications/shiva-store.desktop" << 'EOF'
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/shiva-store.desktop" << 'EOF'
 [Desktop Entry]
 Name=Shiva Commander
 Name[fr]=Shiva Commander

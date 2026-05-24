@@ -1,0 +1,415 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-core
+pkgver=1.0
+pkgrel=1
+pkgdesc="ShivaOS — Configuration gaming système + base"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('shiva-pulse' 'zram-generator' 'gamemode' 'earlyoom' 'vkbasalt' 'mangohud' 'pipewire' 'wireplumber')
+optdepends=(
+    'amd-ucode: microcode AMD'
+    'intel-ucode: microcode Intel'
+)
+install=shiva-core.install
+source=()
+sha256sums=()
+
+package() {
+    # ── pacman repo shivaos ──────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/pacman.d"
+    cat > "${pkgdir}/etc/pacman.d/shivaos.conf" << 'EOF'
+[shivaos]
+SigLevel = Optional TrustAll
+Server = https://freuja-wq.github.io/shivaos-arch-repo/x86_64
+EOF
+
+    # ── os-release ───────────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/lib"
+    cat > "${pkgdir}/usr/lib/os-release" << 'EOF'
+NAME="ShivaOS"
+VERSION="Arch (Pure Gaming Ecosystem)"
+ID=shivaos
+ID_LIKE=arch
+VERSION_ID=rolling
+PRETTY_NAME="ShivaOS Arch — Pure Gaming Ecosystem"
+ANSI_COLOR="1;38;2;0;180;255"
+HOME_URL="https://shivaos.com"
+BUG_REPORT_URL="https://shivaos.com"
+LOGO=shivaos-logo
+EOF
+
+    # ── shiva-ai.conf ────────────────────────────────────────────
+    cat > "${pkgdir}/etc/shiva-ai.conf" << 'EOF'
+backend=auto
+groq_model=llama-3.3-70b-versatile
+ollama_model=phi3:mini
+EOF
+    install -Dm644 "${pkgdir}/etc/shiva-ai.conf" "${pkgdir}/etc/shiva-ai.conf"
+
+    # ── KWallet désactivé ─────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/xdg"
+    cat > "${pkgdir}/etc/xdg/kwalletrc" << 'EOF'
+[Wallet]
+Enabled=false
+First Use=false
+EOF
+    cat > "${pkgdir}/etc/xdg/kded6rc" << 'EOF'
+[Module-kwalletd]
+autoload=false
+[Module-plasma_welcome]
+autoload=false
+EOF
+    cat > "${pkgdir}/etc/xdg/plasma-welcomerc" << 'EOF'
+[General]
+LastStartedVersion=99.0.0
+ShowOnStartup=false
+EOF
+
+    install -dm755 "${pkgdir}/etc/skel/.config"
+    cp "${pkgdir}/etc/xdg/kwalletrc"        "${pkgdir}/etc/skel/.config/kwalletrc"
+    cp "${pkgdir}/etc/xdg/kded6rc"          "${pkgdir}/etc/skel/.config/kded6rc"
+    cp "${pkgdir}/etc/xdg/plasma-welcomerc" "${pkgdir}/etc/skel/.config/plasma-welcomerc"
+
+    # ── sysctl gaming ─────────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/sysctl.d"
+    cat > "${pkgdir}/etc/sysctl.d/99-shivaos-gaming.conf" << 'EOF'
+# ShivaOS Gaming sysctl
+
+# Scheduler
+kernel.sched_autogroup_enabled = 1
+kernel.sched_child_runs_first = 0
+
+# VM gaming
+vm.swappiness = 10
+vm.dirty_ratio = 3
+vm.dirty_background_ratio = 1
+vm.dirty_bytes = 0
+vm.dirty_background_bytes = 0
+vm.dirty_expire_centisecs = 500
+vm.dirty_writeback_centisecs = 100
+vm.page-cluster = 0
+vm.vfs_cache_pressure = 50
+vm.compaction_proactiveness = 0
+vm.oom_kill_allocating_task = 1
+kernel.unprivileged_userns_clone = 1
+
+# Réseau gaming
+net.core.rmem_default = 16777216
+net.core.rmem_max = 16777216
+net.core.wmem_default = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_tw_reuse = 1
+net.core.netdev_max_backlog = 16384
+net.ipv4.tcp_slow_start_after_idle = 0
+
+# Misc
+kernel.split_lock_mitigate = 0
+fs.file-max = 2097152
+kernel.nmi_watchdog = 0
+EOF
+
+    # ── zram-generator ───────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/systemd"
+    cat > "${pkgdir}/etc/systemd/zram-generator.conf" << 'EOF'
+[zram0]
+zram-size = min(ram / 2, 8192)
+compression-algorithm = zstd
+EOF
+
+    # ── earlyoom config ──────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/systemd/system/earlyoom.service.d"
+    cat > "${pkgdir}/etc/systemd/system/earlyoom.service.d/shivaos.conf" << 'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/bin/earlyoom -m 3 -s 10 --prefer '^(Web Content|firefox|chromium)$' --avoid '^(steam|wine|proton|gamemode)$'
+EOF
+
+    # ── gamemode.ini ─────────────────────────────────────────────
+    cat > "${pkgdir}/etc/gamemode.ini" << 'EOF'
+[general]
+reaper_freq=5
+defaultgov=performance
+desiredgov=performance
+igpu_desiredgov=performance
+softrealtime=auto
+renice=-10
+ioprio=0
+inhibit_screensaver=1
+[filter]
+whitelist=
+blacklist=
+[cpu]
+park_cores=no
+pin_cores=yes
+[gpu]
+apply_gpu_optimisations=accept-responsibility
+gpu_device=0
+amd_performance_level=high
+[custom]
+start=notify-send "GameMode ON"
+end=notify-send "GameMode OFF"
+EOF
+
+    # ── vkBasalt.conf ────────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/share/vkBasalt"
+    cat > "${pkgdir}/etc/vkBasalt.conf" << 'EOF'
+effects = cas:fxaa
+casSharpness = 0.4
+fxaaQualitySubpix = 0.75
+fxaaQualityEdgeThreshold = 0.166
+fxaaQualityEdgeThresholdMin = 0.0833
+toggleKey = Home
+EOF
+
+    # ── MangoHud config ──────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/MangoHud"
+    cat > "${pkgdir}/etc/MangoHud/MangoHud.conf" << 'EOF'
+fps
+gpu_stats
+cpu_stats
+ram
+vram
+frame_timing
+toggle_hud=Shift_R+F12
+position=top-left
+background_alpha=0.4
+font_size=20
+EOF
+
+    # ── Mesa env vars ─────────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/environment.d"
+    cat > "${pkgdir}/etc/environment.d/99-shivaos-gaming.conf" << 'EOF'
+mesa_glthread=true
+RADV_PERFTEST=gpl,aco
+__GL_THREADED_OPTIMIZATIONS=1
+MESA_SHADER_CACHE_MAX_SIZE=10G
+EOF
+
+    install -dm755 "${pkgdir}/etc/profile.d"
+    cat > "${pkgdir}/etc/profile.d/shivaos-gaming.sh" << 'EOF'
+export mesa_glthread=true
+export RADV_PERFTEST=gpl,aco
+export __GL_THREADED_OPTIMIZATIONS=1
+export MESA_SHADER_CACHE_MAX_SIZE=10G
+EOF
+
+    # ── udev HID 1000Hz ──────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/lib/udev/rules.d"
+    cat > "${pkgdir}/usr/lib/udev/rules.d/70-shivaos-hid.rules" << 'EOF'
+SUBSYSTEM=="usb", ATTR{idVendor}=="046d", ATTR{bInterfaceClass}=="03", ATTR{bInterfaceSubClass}=="01", ATTR{bInterfaceProtocol}=="02", ATTR{../bConfigurationValue}=="1", RUN+="/bin/sh -c 'echo 1 > /sys/bus/usb/devices/%k/../bConfigurationValue'"
+ACTION=="add|change", KERNEL=="event*", SUBSYSTEM=="input", ATTRS{name}=="*Mouse*", TAG+="uaccess"
+EOF
+
+    # ── udev manettes ────────────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/udev/rules.d/71-shivaos-controllers.rules" << 'EOF'
+# DualSense / DualShock
+KERNEL=="hidraw*", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="0ce6", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="0df2", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="09cc", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="05c4", MODE="0660", TAG+="uaccess"
+# Xbox One/Series
+KERNEL=="hidraw*", ATTRS{idVendor}=="045e", MODE="0660", TAG+="uaccess"
+# 8BitDo
+KERNEL=="hidraw*", ATTRS{idVendor}=="2dc8", MODE="0660", TAG+="uaccess"
+# Steam Deck / Steam Controller
+KERNEL=="hidraw*", ATTRS{idVendor}=="28de", MODE="0660", TAG+="uaccess"
+# Nintendo Switch Pro / Joy-Con
+KERNEL=="hidraw*", ATTRS{idVendor}=="057e", MODE="0660", TAG+="uaccess"
+EOF
+
+    # ── udev I/O scheduler ───────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/udev/rules.d/60-shivaos-ioscheduler.rules" << 'EOF'
+ACTION=="add|change", KERNEL=="nvme*", ATTR{queue/scheduler}="kyber"
+ACTION=="add|change", KERNEL=="sd[a-z]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="mq-deadline"
+ACTION=="add|change", KERNEL=="sd[a-z]*", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="bfq"
+EOF
+
+    # ── udev CPU power ────────────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/udev/rules.d/50-shivaos-cpupower.rules" << 'EOF'
+SUBSYSTEM=="power_supply", ATTR{online}=="1", RUN+="/bin/sh -c 'for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > $f 2>/dev/null || true; done'"
+SUBSYSTEM=="power_supply", ATTR{online}=="0", RUN+="/bin/sh -c 'for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo powersave > $f 2>/dev/null || true; done'"
+EOF
+
+    # ── udev audio ───────────────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/udev/rules.d/20-shivaos-audio.rules" << 'EOF'
+ACTION=="add", SUBSYSTEM=="sound", DRIVER=="snd_hda_intel", ATTR{power/control}="on"
+EOF
+
+    # ── modprobe blacklist ────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/lib/modprobe.d"
+    cat > "${pkgdir}/usr/lib/modprobe.d/shivaos-blacklist.conf" << 'EOF'
+blacklist iTCO_wdt
+blacklist sp5100_tco
+EOF
+
+    cat > "${pkgdir}/usr/lib/modprobe.d/shivaos-nvidia.conf" << 'EOF'
+options nvidia NVreg_UsePageAttributeTable=1
+options nvidia NVreg_InitializeSystemMemoryAllocations=0
+options nvidia NVreg_EnableGpuFirmware=1
+EOF
+
+    # ── Pipewire low-latency ──────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/share/pipewire/pipewire.conf.d"
+    cat > "${pkgdir}/usr/share/pipewire/pipewire.conf.d/99-shivaos-gaming.conf" << 'EOF'
+context.properties = {
+    default.clock.rate = 48000
+    default.clock.quantum = 512
+    default.clock.min-quantum = 32
+    default.clock.max-quantum = 8192
+}
+EOF
+
+    # ── limits gaming ────────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/security/limits.d"
+    cat > "${pkgdir}/etc/security/limits.d/99-shivaos-gaming.conf" << 'EOF'
+@audio - rtprio 95
+@audio - memlock unlimited
+* soft nofile 1048576
+* hard nofile 1048576
+EOF
+
+    # ── systemd limits ───────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/lib/systemd/system.conf.d"
+    install -dm755 "${pkgdir}/usr/lib/systemd/user.conf.d"
+    cat > "${pkgdir}/usr/lib/systemd/system.conf.d/10-shivaos-limits.conf" << 'EOF'
+[Manager]
+DefaultLimitNOFILE=2097152
+DefaultTimeoutStartSec=15s
+DefaultTimeoutStopSec=10s
+EOF
+    cat > "${pkgdir}/usr/lib/systemd/user.conf.d/10-shivaos-limits.conf" << 'EOF'
+[Manager]
+DefaultLimitNOFILE=2097152
+EOF
+
+    # ── DNS Cloudflare via systemd-resolved ──────────────────────
+    install -dm755 "${pkgdir}/etc/systemd/resolved.conf.d"
+    cat > "${pkgdir}/etc/systemd/resolved.conf.d/99-shivaos-doh.conf" << 'EOF'
+[Resolve]
+DNS=1.1.1.1#cloudflare-dns.com 1.0.0.1#cloudflare-dns.com
+FallbackDNS=8.8.8.8
+DNSOverTLS=yes
+DNSSEC=yes
+EOF
+
+    # ── shiva-amd-epp service ─────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/lib/systemd/system"
+    cat > "${pkgdir}/usr/lib/systemd/system/shiva-amd-epp.service" << 'EOF'
+[Unit]
+Description=ShivaOS AMD-pstate EPP performance sur AC
+After=suspend.target hibernate.target hybrid-sleep.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for f in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do echo performance > "$f" 2>/dev/null || true; done'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # ── shiva-irq service ─────────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/systemd/system/shiva-irq.service" << 'EOF'
+[Unit]
+Description=ShivaOS IRQ affinity — réseau/audio sur dernier CPU
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/shiva-pcores
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # ── shiva-qos service ─────────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/systemd/system/shiva-qos.service" << 'EOF'
+[Unit]
+Description=ShivaOS QoS réseau gaming
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for iface in $(ls /sys/class/net/ | grep -v lo); do tc qdisc add dev $iface root prio bands 3 2>/dev/null || true; done'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # ── shiva-temp-alert ──────────────────────────────────────────
+    cat > "${pkgdir}/usr/lib/systemd/system/shiva-temp-alert.service" << 'EOF'
+[Unit]
+Description=ShivaOS GPU Temperature Alert
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '\
+    TEMP=0; \
+    [ -f /sys/class/drm/card0/device/hwmon/hwmon*/temp1_input ] && \
+        TEMP=$(cat /sys/class/drm/card0/device/hwmon/hwmon*/temp1_input | head -1); \
+    [ "$TEMP" -gt 85000 ] 2>/dev/null && \
+        DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus \
+        notify-send "⚠️ GPU Température" "GPU > 85°C — réduire les paramètres graphiques" -u critical || true'
+EOF
+    cat > "${pkgdir}/usr/lib/systemd/system/shiva-temp-alert.timer" << 'EOF'
+[Unit]
+Description=ShivaOS GPU Temperature Alert Timer
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=30
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    # ── shiva-pcores ──────────────────────────────────────────────
+    install -Dm755 /dev/stdin "${pkgdir}/usr/bin/shiva-pcores" << 'EOF'
+#!/bin/bash
+# Pin IRQs réseau/audio sur le dernier CPU
+LAST_CPU=$(nproc --all)
+LAST_CPU=$((LAST_CPU - 1))
+MASK=$(printf '%x' $((1 << LAST_CPU)))
+for irq in $(grep -E 'eth|enp|wlp|audio|snd|xhci' /proc/interrupts | awk -F: '{print $1}' | tr -d ' '); do
+    echo "$MASK" > /proc/irq/$irq/smp_affinity 2>/dev/null || true
+done
+EOF
+
+    # ── shiva-game-launch ─────────────────────────────────────────
+    install -Dm755 /dev/stdin "${pkgdir}/usr/bin/shiva-game-launch" << 'EOF'
+#!/bin/bash
+PROFILE="${SHIVA_GAME_PROFILE:-gaming}"
+case "$PROFILE" in
+    gaming)
+        gamemoderun mangohud "$@"
+        ;;
+    battery)
+        "$@"
+        ;;
+    *)
+        mangohud "$@"
+        ;;
+esac
+EOF
+
+    # ── gamescope session ─────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/share/wayland-sessions"
+    cat > "${pkgdir}/usr/share/wayland-sessions/shivaos-gaming.desktop" << 'EOF'
+[Desktop Entry]
+Name=ShivaOS Gaming (Gamescope)
+Comment=Session gaming ShivaOS via Gamescope
+Exec=gamescope -W 1920 -H 1080 -r 60 --steam -- steam -tenfoot
+Type=Application
+EOF
+
+    # ── mkinitcpio hook GPU ───────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/mkinitcpio.conf.d"
+    cat > "${pkgdir}/etc/mkinitcpio.conf.d/shivaos-gpu.conf" << 'EOF'
+MODULES=(amdgpu radeon i915 xe nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+EOF
+}

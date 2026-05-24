@@ -1,0 +1,15 @@
+post_install() {
+    mkinitcpio -p linux-shivaos
+}
+
+post_upgrade() {
+    mkinitcpio -p linux-shivaos
+}
+
+post_remove() {
+    if [[ -f /boot/vmlinuz-linux-shivaos ]]; then
+        rm -f /boot/vmlinuz-linux-shivaos \
+              /boot/initramfs-linux-shivaos.img \
+              /boot/initramfs-linux-shivaos-fallback.img
+    fi
+}

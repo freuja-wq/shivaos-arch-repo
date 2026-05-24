@@ -1,0 +1,87 @@
+# Maintainer: ShivaOS Team <contact@shivaos.com>
+pkgname=shiva-ai
+pkgver=1.5
+pkgrel=1
+pkgdesc="ShivaOS AI — 7 modules d'intelligence gaming"
+arch=('any')
+url="https://shivaos.com"
+license=('MIT')
+depends=('python' 'shiva-core')
+source=(
+    "shiva-assistant.py"
+    "shiva-repair.py"
+    "shiva-gaming-optimizer.py"
+    "shiva-bug-detector.py"
+    "shiva-fps-coach.py"
+    "shiva-crash-reporter.py"
+    "shiva-update-oracle.py"
+    "shiva-compatibility-scout.py"
+    "shiva-session-report.py"
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+    install -dm755 "$pkgdir/usr/share/shiva-ai"
+    install -dm755 "$pkgdir/usr/bin"
+    install -dm755 "$pkgdir/usr/lib/systemd/system"
+
+    for f in shiva-assistant shiva-repair shiva-gaming-optimizer shiva-bug-detector \
+              shiva-fps-coach shiva-crash-reporter shiva-update-oracle \
+              shiva-compatibility-scout shiva-session-report; do
+        [ -f "$srcdir/${f}.py" ] && install -Dm755 "$srcdir/${f}.py" \
+            "$pkgdir/usr/share/shiva-ai/${f}.py" || true
+    done
+
+    ln -sf /usr/share/shiva-ai/shiva-assistant.py "$pkgdir/usr/bin/shiva"
+
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/shiva-ai.desktop" << 'EOF'
+[Desktop Entry]
+Name=Shiva AI
+Comment=Assistant gaming ShivaOS
+Exec=bash -c '/usr/bin/shiva; read -p "Appuyez sur Entrée pour fermer..."'
+Icon=utilities-terminal
+Terminal=true
+Type=Application
+Categories=Utility;Game;
+EOF
+
+    install -dm755 "$pkgdir/etc/skel/Desktop"
+    install -Dm755 "$pkgdir/usr/share/applications/shiva-ai.desktop" \
+        "$pkgdir/etc/skel/Desktop/shiva-ai.desktop"
+
+    # Services auto-repair et timers
+    cat > "$pkgdir/usr/lib/systemd/system/shiva-repair.service" << 'EOF'
+[Unit]
+Description=ShivaOS Auto-Repair 24/7
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/share/shiva-ai/shiva-repair.py
+Restart=on-failure
+RestartSec=10
+User=root
+EOF
+
+    cat > "$pkgdir/usr/lib/systemd/system/shiva-update-oracle.service" << 'EOF'
+[Unit]
+Description=ShivaOS Update Oracle
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/share/shiva-ai/shiva-update-oracle.py
+EOF
+
+    cat > "$pkgdir/usr/lib/systemd/system/shiva-update-oracle.timer" << 'EOF'
+[Unit]
+Description=ShivaOS Update Oracle Timer
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
+}
