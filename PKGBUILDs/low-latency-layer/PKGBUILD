@@ -2,7 +2,7 @@
 # Couche Vulkan implicite — Reflex + Anti-Lag sur tous les GPU
 # Usage Steam : PROTON_FORCE_NVAPI=1 LOW_LATENCY_LAYER_REFLEX=1 LOW_LATENCY_LAYER_SPOOF_NVIDIA=1 %command%
 pkgname=low-latency-layer
-pkgver=0.1.0
+pkgver=2.0.0
 pkgrel=1
 pkgdesc="Vulkan implicit layer — Reflex + Anti-Lag pour tous les GPU"
 arch=('x86_64')
