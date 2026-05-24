@@ -4,3 +4,5 @@ PKGBUILDs/*/*.svg
 PKGBUILDs/*/*.png
 PKGBUILDs/*/src/
 PKGBUILDs/*/pkg/
+repo/x86_64/linux-shivaos*.pkg.tar.zst
+repo/x86_64/linux-shivaos*.pkg.tar.zst.sig
