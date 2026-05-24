@@ -1,4 +1,11 @@
 post_install() {
+    # Importer la clé GPG ShivaOS pour la vérification des paquets
+    if ! pacman-key --list-keys contact@shivaos.com &>/dev/null; then
+        curl -sL https://shivaos.com/arch-repo/shivaos.gpg | pacman-key --add - 2>/dev/null || \
+        curl -sL https://freuja-wq.github.io/shivaos-arch-repo/shivaos.gpg | pacman-key --add - 2>/dev/null || true
+        pacman-key --lsign-key contact@shivaos.com 2>/dev/null || true
+    fi
+
     # Activer les services gaming
     systemctl enable shiva-amd-epp.service 2>/dev/null || true
     systemctl enable shiva-irq.service 2>/dev/null || true

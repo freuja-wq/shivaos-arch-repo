@@ -10,6 +10,7 @@ PKGBUILDS_DIR="$ARCH_DIR/PKGBUILDs"
 REPO_DIR="$ARCH_DIR/repo/x86_64"
 SOURCES_DIR="/run/media/freuja/WinToUSB/ShivaOS_Project/RPM_BUILD/SOURCES"
 REPO_NAME="shivaos"
+GPG_KEY="contact@shivaos.com"
 
 echo "======================================"
 echo "  ShivaOS — Build Repo Pacman (Arch)"
@@ -72,8 +73,15 @@ for pkgdir in "$PKGBUILDS_DIR"/*/; do
             chown -R builder:builder /build
             su builder -c 'makepkg -s --noconfirm --noprogressbar --skipchecksums 2>&1'
         " && {
-        # Déplacer les paquets buildés
-        mv "$pkgdir"/*.pkg.tar.zst "$REPO_DIR/" 2>/dev/null || true
+        # Signer et déplacer les paquets buildés
+        for pkg_file in "$pkgdir"/*.pkg.tar.zst; do
+            [ -f "$pkg_file" ] || continue
+            gpg --detach-sign --use-agent -u "$GPG_KEY" "$pkg_file" 2>/dev/null && \
+                echo "  🔏 Signé: $(basename "$pkg_file")" || \
+                echo "  ⚠️  Signature échouée (clé absente?)"
+            mv "$pkg_file" "$REPO_DIR/"
+            [ -f "${pkg_file}.sig" ] && mv "${pkg_file}.sig" "$REPO_DIR/"
+        done
         echo "  ✅ $pkg buildé"
         BUILT=$((BUILT + 1))
     } || {
@@ -90,7 +98,7 @@ echo ""
 echo "══ Génération repo pacman ══"
 if command -v repo-add &>/dev/null && ls "$REPO_DIR"/*.pkg.tar.zst &>/dev/null; then
     cd "$REPO_DIR"
-    repo-add "$REPO_NAME.db.tar.gz" *.pkg.tar.zst
+    repo-add --sign --key "$GPG_KEY" "$REPO_NAME.db.tar.gz" *.pkg.tar.zst
 else
     podman run --rm \
         -v "$REPO_DIR:/repo:z" \
