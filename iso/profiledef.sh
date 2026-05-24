@@ -24,4 +24,7 @@ file_permissions=(
     ["/usr/local/bin/Installation_guide"]="0:0:755"
     ["/usr/local/bin/livecd-sound"]="0:0:755"
     ["/usr/local/bin/shivaos-install"]="0:0:755"
+    ["/root/Desktop/shiva-commander.desktop"]="0:0:755"
+    ["/root/Desktop/shiva-ai.desktop"]="0:0:755"
+    ["/root/Desktop/shivaos.desktop"]="0:0:755"
 )

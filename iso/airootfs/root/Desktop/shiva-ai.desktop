@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Shiva AI
+Name[fr]=Shiva AI
+Comment=Assistant IA ShivaOS — Gaming & Système
+Exec=konsole -e shiva
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Utility;System;
+Keywords=ai;assistant;gaming;
+X-KDE-SubstituteUID=false

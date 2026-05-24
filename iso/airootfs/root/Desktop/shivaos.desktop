@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=ShivaOS
+Name[fr]=ShivaOS
+Comment=Site officiel ShivaOS
+Exec=xdg-open https://shivaos.com
+Icon=shivaos
+Terminal=false
+Type=Application
+Categories=Network;
+Keywords=shivaos;gaming;

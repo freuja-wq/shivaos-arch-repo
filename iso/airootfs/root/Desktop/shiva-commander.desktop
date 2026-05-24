@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Shiva Commander
+Name[fr]=Shiva Commander
+Comment=Gaming Hub ShivaOS — Apps, Pilotes, Mises à jour
+Exec=shiva-store
+Icon=shiva-store
+Terminal=false
+Type=Application
+Categories=Game;System;
+Keywords=gaming;store;apps;
+X-KDE-SubstituteUID=false
