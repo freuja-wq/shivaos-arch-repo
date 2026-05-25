@@ -8,9 +8,7 @@ iso_application="ShivaOS Arch — Pure Gaming Ecosystem"
 iso_version="$(date +%Y%m%d)"
 install_dir="arch"
 buildmodes=('iso')
-bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito'
-           'uefi-ia32.systemd-boot.esp' 'uefi-x64.systemd-boot.esp'
-           'uefi-ia32.systemd-boot.eltorito' 'uefi-x64.systemd-boot.eltorito')
+bootmodes=('bios.syslinux' 'uefi.systemd-boot')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
@@ -27,4 +25,5 @@ file_permissions=(
     ["/root/Desktop/shiva-commander.desktop"]="0:0:755"
     ["/root/Desktop/shiva-ai.desktop"]="0:0:755"
     ["/root/Desktop/shivaos.desktop"]="0:0:755"
+    ["/root/Desktop/install-shivaos.desktop"]="0:0:755"
 )

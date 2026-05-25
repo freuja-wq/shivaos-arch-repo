@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Installer ShivaOS
+Name[en]=Install ShivaOS
+Name[fr]=Installer ShivaOS
+Comment=Installer ShivaOS Arch sur le disque
+Comment[en]=Install ShivaOS Arch to disk
+Exec=konsole --hold -e /usr/local/bin/shivaos-install
+Icon=system-software-install
+Terminal=false
+Type=Application
+Categories=System;
+Keywords=install;installer;shivaos;

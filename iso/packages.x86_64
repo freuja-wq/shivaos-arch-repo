@@ -6,6 +6,7 @@ linux-shivaos
 linux-shivaos-headers
 grub
 efibootmgr
+syslinux
 dosfstools
 mtools
 gptfdisk
@@ -34,7 +35,6 @@ earlyoom
 # ── KDE Plasma ─────────────────────────────────────────────────
 plasma-meta
 kde-applications-meta
-plasma-wayland-session
 sddm
 sddm-kcm
 xorg-server
@@ -54,9 +54,7 @@ vulkan-icd-loader
 lib32-vulkan-radeon
 lib32-vulkan-intel
 lib32-vulkan-icd-loader
-vkbasalt
 lib32-gamemode
-proton-ge-custom
 
 # ── Drivers GPU ────────────────────────────────────────────────
 mesa
@@ -87,7 +85,11 @@ shiva-amd
 shiva-nvidia
 low-latency-layer
 
+# ── Installeur ────────────────────────────────────────────────
+archinstall
+
 # ── Outils ────────────────────────────────────────────────────
+mkinitcpio-archiso
 pipewire
 pipewire-alsa
 pipewire-pulse

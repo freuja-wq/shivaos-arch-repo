@@ -1,15 +1,330 @@
 #!/bin/bash
-# ShivaOS Arch — Script d'installation guidée
-# Lance Calamares si présent, sinon guide texte
+# ShivaOS Arch — Installation guidée via archinstall
 
-if command -v calamares &>/dev/null; then
-    exec calamares
+clear
+
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║         ShivaOS Arch — Installation                 ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo ""
+echo "  [1] Français"
+echo "  [2] English"
+echo ""
+read -rp "Choix / Choice [1/2, défaut/default: 1]: " LANG_CHOICE
+
+if [[ "$LANG_CHOICE" == "2" ]]; then
+    LANG_CODE="en"
 else
-    echo "======================================"
-    echo "  ShivaOS Arch — Installation"
-    echo "======================================"
-    echo ""
-    echo "Calamares non trouvé. Utilise archinstall :"
-    echo ""
-    exec archinstall
+    LANG_CODE="fr"
 fi
+
+# === DÉTECTION GPU ===
+GPU_VENDOR="unknown"
+GPU_NAME=""
+NVIDIA_PKG="nvidia-open"   # défaut : open (Turing+)
+NVIDIA_ARCH="open"
+
+if lspci 2>/dev/null | grep -qi "nvidia"; then
+    GPU_VENDOR="nvidia"
+    GPU_NAME=$(lspci -nn 2>/dev/null | grep -i nvidia | grep -i "vga\|3d\|display" | head -1 | sed 's/.*: //' | sed 's/ \[.*//')
+
+    # Détecter l'architecture via le PCI device ID
+    # Turing (RTX 2000+, GTX 1650/1660) : IDs >= 0x1E00 → nvidia-open
+    # Pascal (GTX 10xx), Maxwell (GTX 9xx), Kepler → nvidia propriétaire
+    NVIDIA_PCI_ID=$(lspci -nn 2>/dev/null | grep -i nvidia | grep -i "vga\|3d\|display" \
+        | grep -oP '\[10de:\K[0-9a-fA-F]+' | head -1)
+
+    if [[ -n "$NVIDIA_PCI_ID" ]]; then
+        PCI_DEC=$((16#$NVIDIA_PCI_ID))
+        if [[ $PCI_DEC -ge $((16#1E00)) ]]; then
+            # Turing et plus récent (RTX 2000+, GTX 1650/1660) → nvidia-open
+            NVIDIA_PKG="nvidia-open"
+            NVIDIA_ARCH="open"
+        elif [[ $PCI_DEC -ge $((16#1000)) ]]; then
+            # Maxwell / Pascal / Volta (GTX 750, 900, 1000, Titan V) → nvidia propriétaire actuel
+            NVIDIA_PKG="nvidia"
+            NVIDIA_ARCH="proprietary"
+        else
+            # Kepler et plus ancien (GTX 600/700) → nvidia-470xx-dkms (AUR, non dispo auto)
+            NVIDIA_PKG="nvidia"
+            NVIDIA_ARCH="kepler"
+        fi
+    fi
+
+elif lspci 2>/dev/null | grep -qi "amd\|radeon\|ati"; then
+    GPU_VENDOR="amd"
+    GPU_NAME=$(lspci 2>/dev/null | grep -i "amd\|radeon\|ati" | grep -i "vga\|3d\|display" \
+        | head -1 | sed 's/.*: //')
+elif lspci 2>/dev/null | grep -qi "intel.*graphics\|intel.*vga\|intel.*3d"; then
+    GPU_VENDOR="intel"
+    GPU_NAME=$(lspci 2>/dev/null | grep -i intel | grep -i "vga\|3d\|display" \
+        | head -1 | sed 's/.*: //')
+fi
+
+# === CHOIX CLAVIER ===
+clear
+
+if [[ "$LANG_CODE" == "fr" ]]; then
+    echo "╔══════════════════════════════════════════════════════╗"
+    echo "║              Disposition du clavier                 ║"
+    echo "╚══════════════════════════════════════════════════════╝"
+    echo ""
+    echo "  [1] Français    — AZERTY              (fr)"
+    echo "  [2] English US  — QWERTY              (us)"
+    echo "  [3] English UK  — QWERTY UK           (uk)"
+    echo "  [4] Español     — QWERTY Latin        (es)"
+    echo "  [5] Deutsch     — QWERTZ              (de)"
+    echo "  [6] Autre       — choisir dans l'installateur"
+    echo ""
+    read -rp "  Ton choix [1-6, défaut: 1]: " KB_CHOICE
+else
+    echo "╔══════════════════════════════════════════════════════╗"
+    echo "║                 Keyboard Layout                     ║"
+    echo "╚══════════════════════════════════════════════════════╝"
+    echo ""
+    echo "  [1] Français    — AZERTY              (fr)"
+    echo "  [2] English US  — QWERTY              (us)"
+    echo "  [3] English UK  — QWERTY UK           (uk)"
+    echo "  [4] Español     — QWERTY Latin        (es)"
+    echo "  [5] Deutsch     — QWERTZ              (de)"
+    echo "  [6] Other       — choose in the installer"
+    echo ""
+    read -rp "  Your choice [1-6, default: 2]: " KB_CHOICE
+fi
+
+case "$KB_CHOICE" in
+    2) KB_LOADKEYS="us"; KB_JSON="us"; SYS_LANG="en_US" ;;
+    3) KB_LOADKEYS="uk"; KB_JSON="uk"; SYS_LANG="en_GB" ;;
+    4) KB_LOADKEYS="es"; KB_JSON="es"; SYS_LANG="es_ES" ;;
+    5) KB_LOADKEYS="de"; KB_JSON="de"; SYS_LANG="de_DE" ;;
+    6) KB_LOADKEYS="";   KB_JSON="";   SYS_LANG=""       ;;
+    *) KB_LOADKEYS="fr"; KB_JSON="fr"; SYS_LANG="fr_FR"  ;;
+esac
+
+if [[ -n "$KB_LOADKEYS" ]]; then
+    loadkeys "$KB_LOADKEYS" 2>/dev/null
+fi
+
+# === GÉNÉRATION JSON ADAPTÉ ===
+python3 - <<PYEOF
+import json
+
+with open('/etc/shivaos-install.json') as f:
+    cfg = json.load(f)
+
+# Clavier / langue
+kb = '$KB_JSON'
+lang = '$SYS_LANG'
+if kb:
+    cfg['locale_config']['kb_layout'] = kb
+    cfg['locale_config']['sys_lang'] = lang
+
+# Adapter le driver NVIDIA selon l'architecture détectée
+gpu_vendor = '$GPU_VENDOR'
+nvidia_pkg = '$NVIDIA_PKG'
+
+if gpu_vendor == 'nvidia':
+    pkgs = cfg.get('packages', [])
+    # Retirer les deux variantes pour repartir proprement
+    pkgs = [p for p in pkgs if p not in ('nvidia-open', 'nvidia')]
+    # Ajouter la bonne
+    pkgs.append(nvidia_pkg)
+    cfg['packages'] = pkgs
+
+with open('/tmp/shivaos-install.json', 'w') as f:
+    json.dump(cfg, f, indent=4)
+PYEOF
+
+INSTALL_CFG="/tmp/shivaos-install.json"
+
+# === ÉCRAN DE RÉSUMÉ ===
+clear
+
+if [[ "$LANG_CODE" == "fr" ]]; then
+
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║         ShivaOS Arch — Installation                 ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo ""
+echo "  Pré-configuré automatiquement :"
+echo "    ✓ Kernel ShivaOS (BORE scheduler + BBR3)"
+echo "    ✓ KDE Plasma 6"
+echo "    ✓ Outils gaming (Steam, MangoHud, Gamescope...)"
+echo "    ✓ Paquets ShivaOS (Shiva Commander, Shiva AI...)"
+echo "    ✓ NetworkManager"
+echo ""
+echo "  Tu devras choisir :"
+echo "    → Disque de destination"
+echo "    → Nom d'utilisateur et mot de passe"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+case "$GPU_VENDOR" in
+    nvidia)
+        case "$NVIDIA_ARCH" in
+            open)
+                echo "  🎮 GPU : NVIDIA — driver open-source (Turing / RTX)" ;;
+            proprietary)
+                echo "  🎮 GPU : NVIDIA — driver propriétaire (Maxwell / Pascal / GTX 1080...)" ;;
+            kepler)
+                echo "  🎮 GPU : NVIDIA — driver propriétaire installé (GTX 600/700 détecté)"
+                echo ""
+                echo "  ⚠  Kepler (GTX 600/700) : le driver actuel peut ne pas fonctionner."
+                echo "     Pour un support complet, installe nvidia-470xx-dkms depuis l'AUR"
+                echo "     après l'installation." ;;
+        esac
+        ;;
+    amd)   echo "  🎮 GPU : AMD — driver Mesa (open-source)" ;;
+    intel) echo "  🎮 GPU : Intel — driver Mesa (open-source)" ;;
+    *)     echo "  🎮 GPU : non détecté — tous les drivers seront installés" ;;
+esac
+[[ -n "$GPU_NAME" ]] && echo "       ($GPU_NAME)"
+echo ""
+
+case "$KB_LOADKEYS" in
+    fr) KB_DISPLAY="AZERTY Français" ;;
+    us) KB_DISPLAY="QWERTY US" ;;
+    uk) KB_DISPLAY="QWERTY UK" ;;
+    es) KB_DISPLAY="QWERTY Español" ;;
+    de) KB_DISPLAY="QWERTZ Deutsch" ;;
+    *)  KB_DISPLAY="à choisir dans l'installateur" ;;
+esac
+echo "  ⌨  Clavier actif : $KB_DISPLAY"
+echo "     Ton mot de passe sera saisi avec ce layout."
+echo "     Conseil : lettres minuscules + chiffres, sans accents."
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  ⚠  L'installation effacera le disque choisi."
+echo ""
+read -rp "  Appuie sur Entrée pour lancer l'installation..."
+
+else
+
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║         ShivaOS Arch — Installation                 ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo ""
+echo "  Pre-configured automatically:"
+echo "    ✓ ShivaOS Kernel (BORE scheduler + BBR3)"
+echo "    ✓ KDE Plasma 6"
+echo "    ✓ Gaming tools (Steam, MangoHud, Gamescope...)"
+echo "    ✓ ShivaOS packages (Shiva Commander, Shiva AI...)"
+echo "    ✓ NetworkManager"
+echo ""
+echo "  You will need to choose:"
+echo "    → Target disk"
+echo "    → Username and password"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+case "$GPU_VENDOR" in
+    nvidia)
+        case "$NVIDIA_ARCH" in
+            open)
+                echo "  🎮 GPU: NVIDIA — open-source driver (Turing / RTX)" ;;
+            proprietary)
+                echo "  🎮 GPU: NVIDIA — proprietary driver (Maxwell / Pascal / GTX 1080...)" ;;
+            kepler)
+                echo "  🎮 GPU: NVIDIA — proprietary driver installed (GTX 600/700 detected)"
+                echo ""
+                echo "  ⚠  Kepler (GTX 600/700): current driver may not work fully."
+                echo "     For full support, install nvidia-470xx-dkms from the AUR"
+                echo "     after installation." ;;
+        esac
+        ;;
+    amd)   echo "  🎮 GPU: AMD — Mesa driver (open-source)" ;;
+    intel) echo "  🎮 GPU: Intel — Mesa driver (open-source)" ;;
+    *)     echo "  🎮 GPU: not detected — all drivers will be installed" ;;
+esac
+[[ -n "$GPU_NAME" ]] && echo "       ($GPU_NAME)"
+echo ""
+
+case "$KB_LOADKEYS" in
+    fr) KB_DISPLAY="AZERTY French" ;;
+    us) KB_DISPLAY="QWERTY US" ;;
+    uk) KB_DISPLAY="QWERTY UK" ;;
+    es) KB_DISPLAY="QWERTY Spanish" ;;
+    de) KB_DISPLAY="QWERTZ German" ;;
+    *)  KB_DISPLAY="to be chosen in the installer" ;;
+esac
+echo "  ⌨  Active keyboard: $KB_DISPLAY"
+echo "     Your password will be typed with this layout."
+echo "     Tip: use lowercase letters + digits, no accented characters."
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  ⚠  WARNING: Installation will erase the selected disk."
+echo ""
+read -rp "  Press Enter to start the installation..."
+
+fi
+
+# === CORRECTION REPO SHIVAOS (file:// → URL en ligne) ===
+# build-iso.sh remplace l'URL par file:///shivaos-repo pour le build local.
+# Au boot du live, ce chemin n'existe plus — on remet les URLs en ligne.
+sed -i \
+    's|Server = file:///shivaos-repo|Server = https://shivaos.com/arch-repo/x86_64|' \
+    /etc/pacman.conf 2>/dev/null || true
+# Ajouter le fallback GitHub Pages s'il n'est pas déjà là
+if ! grep -q 'freuja-wq.github.io' /etc/pacman.conf; then
+    sed -i '/Server = https:\/\/shivaos.com\/arch-repo/a Server = https://freuja-wq.github.io/shivaos-arch-repo/x86_64' \
+        /etc/pacman.conf 2>/dev/null || true
+fi
+pacman -Sy --noconfirm 2>/dev/null || true
+
+# === LANCEMENT ARCHINSTALL ===
+archinstall --config "$INSTALL_CFG"
+ARCHINSTALL_EXIT=$?
+
+# === POST-INSTALL : CONFIGURATION NVIDIA ===
+TARGET="/mnt"
+
+if [[ "$GPU_VENDOR" == "nvidia" && -d "$TARGET/etc" ]]; then
+    clear
+    if [[ "$LANG_CODE" == "fr" ]]; then
+        echo "  Configuration NVIDIA post-installation..."
+    else
+        echo "  Post-install NVIDIA configuration..."
+    fi
+
+    # Modules dans mkinitcpio
+    if [[ -f "$TARGET/etc/mkinitcpio.conf" ]]; then
+        if ! grep -q "nvidia" "$TARGET/etc/mkinitcpio.conf"; then
+            sed -i 's/^MODULES=(\(.*\))/MODULES=(\1 nvidia nvidia_modeset nvidia_uvm nvidia_drm)/' \
+                "$TARGET/etc/mkinitcpio.conf"
+        fi
+    fi
+
+    # modeset=1 via modprobe
+    mkdir -p "$TARGET/etc/modprobe.d"
+    echo "options nvidia-drm modeset=1" > "$TARGET/etc/modprobe.d/nvidia.conf"
+
+    # Blacklist nouveau
+    {
+        echo "blacklist nouveau"
+        echo "options nouveau modeset=0"
+    } > "$TARGET/etc/modprobe.d/blacklist-nouveau.conf"
+
+    # Paramètre kernel dans GRUB
+    if [[ -f "$TARGET/etc/default/grub" ]]; then
+        if ! grep -q "nvidia-drm.modeset" "$TARGET/etc/default/grub"; then
+            sed -i 's/\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 nvidia-drm.modeset=1"/' \
+                "$TARGET/etc/default/grub"
+            arch-chroot "$TARGET" grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null
+        fi
+    fi
+
+    # Rebuild initramfs
+    arch-chroot "$TARGET" mkinitcpio -P 2>/dev/null
+
+    if [[ "$LANG_CODE" == "fr" ]]; then
+        echo "  ✓ NVIDIA configuré (driver: $NVIDIA_PKG, modules initramfs, kernel param)"
+    else
+        echo "  ✓ NVIDIA configured (driver: $NVIDIA_PKG, initramfs modules, kernel param)"
+    fi
+fi
+
+exit $ARCHINSTALL_EXIT
